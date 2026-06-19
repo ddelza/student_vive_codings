@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: transparent; margin: 0; padding: 15px; }
+
+    /* 검색창 및 정렬 컨테이너 스타일 */
+    .search-container {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+      max-width: 600px;
+      margin: 0 auto 25px auto;
+    }
+    #searchInput {
+      flex: 1;
+      padding: 12px 20px;
+      border: 1px solid #ccc; border-radius: 25px; font-size: 15px;
+      outline: none; transition: border-color 0.3s, box-shadow 0.3s;
+      box-sizing: border-box; box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+    }
+    #searchInput:focus { border-color: #3498db; box-shadow: 0 2px 8px rgba(52, 152, 219, 0.3); }
+
+    /* 정렬 드롭다운 스타일 추가 */
+    #sortSelect {
+      padding: 12px 15px;
+      border: 1px solid #ccc; border-radius: 25px; font-size: 14px;
+      outline: none; cursor: pointer; background-color: white; color: #2c3e50;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.05); transition: border-color 0.3s;
+    }
+    #sortSelect:focus { border-color: #3498db; }
+
+    /* 카드 및 갤러리 레이아웃 */
+    .gallery-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 15px; }
+    .card { background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); border-left: 5px solid #3498db; display: flex; flex-direction: column;}
+    .title { font-weight: bold; font-size: 16px; margin-bottom: 5px; color: #2c3e50; }
+    .author { font-size: 12px; color: #7f8c8d; margin-bottom: 15px; }
+    .empty-message { text-align: center; color: #7f8c8d; grid-column: 1 / -1; padding: 20px; }
+
+    /* 버튼 스타일 */
+    .btn-group { margin-top: auto; display: flex; flex-direction: column; gap: 8px; }
+    .btn { display: inline-block; padding: 8px 12px; background: #3498db; color: white; text-decoration: none; border-radius: 4px; font-size: 13px; text-align: center; cursor: pointer; border: none; transition: background 0.2s;}
+    .btn:hover { background: #2980b9; }
+    .btn-file { background: #e67e22; }
+    .btn-file:hover { background: #d35400; }
+
+    /* 좋아요 버튼 전용 스타일 */
+    .btn-like { background: #ff4757; font-weight: bold; border: 1px solid #ff4757; color: white; }
+    .btn-like:hover { background: #ff6b81; border-color: #ff6b81; }
+    .btn-like:disabled { background: #f1f2f6; color: #a4b0be; border-color: #ced6e0; cursor: not-allowed; }
+    .btn-like-toggle { background: #f1f2f6; color: #576574; border: 1px solid #ced6e0; padding: 0 12px; font-size: 11px; border-radius: 4px; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; }
+    .btn-like-toggle:hover { background: #dfe4ea; border-color: #a4b0be; }
+    .like-names-dropdown { display: none; font-size: 12px; background: #f8f9fa; padding: 10px; border-radius: 4px; border: 1px solid #e1e8ed; margin-top: 5px; color: #2f3640; word-break: keep-all; line-height: 1.5; box-shadow: inset 0 1px 3px rgba(0,0,0,0.05); }
+  </style>
+</head>
+<body>
+
+  <!-- 검색창 및 정렬 UI -->
+  <div class="search-container">
+    <input type="text" id="searchInput" placeholder="🔍 이름, 학년, 반 또는 작품명으로 검색..." onkeyup="filterAndSortGallery()">
+    <select id="sortSelect" onchange="filterAndSortGallery()">
+      <option value="latest">제출 최신순</option>
+      <option value="class">학급순</option>
+      <option value="likes">좋아요 많은 순</option>
+    </select>
+  </div>
+
+  <div class="gallery-grid" id="gallery">
+    <p class="empty-message">📡 학생들의 작품을 불러오는 중입니다...</p>
+  </div>
+
+  <script>
+    // 서버에서 불러온 전체 데이터를 저장할 전역 변수
+    var allProjects = [];
+
+    window.onload = function() {
+      // 구글 앱스 스크립트 환경인지 확인
+      if (typeof google !== 'undefined' && google.script) {
+        // 서버에서 학생 데이터 불러오기
+        google.script.run.withSuccessHandler(function(projects) {
+          // 정렬을 위해 최초 불러온 순서(최신순)를 기억해둡니다.
+          projects.forEach(function(p, i) { p.originalIndex = i; });
+          allProjects = projects;
+          filterAndSortGallery();
+        }).getStudentProjects();
+      } else {
+        // 미리보기 등 외부 환경에서 에러 방지를 위한 더미 데이터 적용
+        console.warn("Google Apps Script 환경이 아닙니다. 미리보기 데이터를 표시합니다.");
+        var dummyProjects = [
+          { rowIndex: 2, projectName: "테스트 작품 (미리보기)", studentInfo: "1학년 1반 1번 홍길동", isHtmlCode: true, codeText: "<h1>미리보기 화면입니다.</h1><p>앱스 스크립트에서 배포하면 실제 데이터가 보입니다.</p>", fileUrl: "없음", likes: "선생님, 친구1, 친구2" },
+          { rowIndex: 3, projectName: "파일 제출 테스트", studentInfo: "2학년 3반 15번 이순신", isHtmlCode: false, codeText: "", fileUrl: "#", likes: "" },
+          { rowIndex: 4, projectName: "정렬 테스트용", studentInfo: "1학년 2반 5번 유관순", isHtmlCode: true, codeText: "<h1>정렬 테스트</h1>", fileUrl: "없음", likes: "테스터" }
+        ];
+        dummyProjects.forEach(function(p, i) { p.originalIndex = i; });
+        allProjects = dummyProjects;
+        filterAndSortGallery();
+      }
+    };
+
+    // 갤러리 화면을 그려주는 함수
+    function renderGallery(projects) {
+      var container = document.getElementById('gallery');
+      container.innerHTML = '';
+
+      if(projects.length === 0) {
+        container.innerHTML = '<p class="empty-message">해당하는 작품이 없습니다.</p>';
+        return;
+      }
+
+      projects.forEach(function(project) {
+        var card = document.createElement('div');
+        card.className = 'card';
+
+        var title = '<div class="title">' + project.projectName + '</div>';
+        var author = '<div class="author">' + project.studentInfo + '</div>';
+        card.innerHTML = title + author;
+
+        // 버튼들을 담을 그룹 컨테이너
+        var btnGroup = document.createElement('div');
+        btnGroup.className = 'btn-group';
+
+        // 1. 작품 실행/보기 버튼
+        if (project.isHtmlCode) {
+          var blob = new Blob([project.codeText], { type: 'text/html;charset=utf-8' });
+          var blobUrl = URL.createObjectURL(blob);
+          var link = document.createElement('a');
+          link.className = 'btn';
+          link.innerHTML = '▶️ 작품 실행하기';
+          link.href = blobUrl;
+          link.target = '_blank';
+          btnGroup.appendChild(link);
+        } else if (project.fileUrl !== "없음") {
+          var link = document.createElement('a');
+          link.className = 'btn btn-file';
+          link.href = project.fileUrl;
+          link.target = '_blank';
+          link.innerHTML = '📄 코드 파일 보기';
+          btnGroup.appendChild(link);
+        }
+
+        // 2. 좋아요 버튼 로직
+        var likesArray = project.likes ? project.likes.split(',').filter(Boolean) : [];
+
+        var likeContainer = document.createElement('div');
+        likeContainer.style.display = 'flex';
+        likeContainer.style.flexDirection = 'column';
+
+        var likeTopRow = document.createElement('div');
+        likeTopRow.style.display = 'flex';
+        likeTopRow.style.gap = '5px';
+
+        var likeBtn = document.createElement('button');
+        likeBtn.className = 'btn btn-like';
+        likeBtn.style.flex = '1';
+
+        var toggleBtn = null;
+        var namesDropdown = null;
+
+        // 현재 좋아요 상태 텍스트 세팅
+        if (likesArray.length > 0) {
+          likeBtn.innerHTML = '❤️ ' + likesArray.length + '명';
+
+          toggleBtn = document.createElement('button');
+          toggleBtn.className = 'btn btn-like-toggle';
+          toggleBtn.innerHTML = '목록 ▼';
+          toggleBtn.title = '좋아요 명단 보기';
+
+          namesDropdown = document.createElement('div');
+          namesDropdown.className = 'like-names-dropdown';
+          namesDropdown.innerHTML = project.likes.split(',').join(', ');
+
+          // 드롭다운 토글 버튼 클릭 이벤트
+          toggleBtn.onclick = function() {
+            if (namesDropdown.style.display === 'block') {
+              namesDropdown.style.display = 'none';
+              toggleBtn.innerHTML = '목록 ▼';
+            } else {
+              namesDropdown.style.display = 'block';
+              toggleBtn.innerHTML = '목록 ▲';
+            }
+          };
+        } else {
+          likeBtn.innerHTML = '🤍 좋아요 누르기';
+        }
+
+        // 좋아요 버튼 클릭 이벤트
+        likeBtn.onclick = function() {
+          var likerName = prompt('작품이 마음에 드시나요? 이름을 남겨주세요! (예: 홍길동)');
+          if (likerName && likerName.trim() !== '') {
+            likerName = likerName.trim();
+            likeBtn.disabled = true; // 중복 클릭 방지
+            likeBtn.innerHTML = '저장 중... ⏳';
+
+            // 구글 앱스 스크립트 환경인지 확인
+            if (typeof google !== 'undefined' && google.script) {
+              // 서버(Code.gs)로 좋아요 데이터 전송
+              google.script.run
+                .withSuccessHandler(function(updatedLikes) {
+                  // 성공 시 현재 화면의 데이터만 업데이트하고, 현재 검색/정렬 상태 유지하며 리렌더링
+                  project.likes = updatedLikes;
+                  filterAndSortGallery();
+                })
+                .withFailureHandler(function(error) {
+                  alert('앗! 오류가 발생했어요: ' + error.message);
+                  filterAndSortGallery(); // 실패 시 화면 원상복구
+                })
+                .addLike(project.rowIndex, likerName);
+            } else {
+              // 미리보기 환경 가상 처리
+              alert('[미리보기] ' + likerName + '님의 좋아요가 등록되었습니다.');
+              var previewLikes = project.likes ? project.likes.split(',').filter(Boolean) : [];
+              previewLikes.push(likerName);
+              project.likes = previewLikes.join(',');
+              filterAndSortGallery();
+            }
+          }
+        };
+
+        // 요소들 조립
+        likeTopRow.appendChild(likeBtn);
+        if (toggleBtn) likeTopRow.appendChild(toggleBtn);
+        likeContainer.appendChild(likeTopRow);
+        if (namesDropdown) likeContainer.appendChild(namesDropdown);
+
+        btnGroup.appendChild(likeContainer);
+        card.appendChild(btnGroup);
+        container.appendChild(card);
+      });
+    }
+
+    // 검색어 및 선택된 정렬 방식에 맞춰 카드를 필터링하고 정렬하는 통합 함수
+    function filterAndSortGallery() {
+      var searchTerm = document.getElementById('searchInput').value.toLowerCase();
+      var sortType = document.getElementById('sortSelect').value;
+
+      // 1. 검색어 필터링
+      var filteredProjects = allProjects.filter(function(project) {
+        var searchTarget = (project.projectName + " " + project.studentInfo).toLowerCase();
+        return searchTarget.includes(searchTerm);
+      });
+
+      // 2. 선택된 방식에 따른 정렬
+      filteredProjects.sort(function(a, b) {
+        if (sortType === 'class') {
+          // 'X학년 Y반 Z번' 문자열에서 숫자를 추출하여 정렬 가중치 생성
+          var parseClass = function(info) {
+            var match = info.match(/(\d+)학년\s*(\d+)반\s*(\d+)번/);
+            if (match) {
+              return (parseInt(match[1]) * 10000) + (parseInt(match[2]) * 100) + parseInt(match[3]);
+            }
+            return 999999; // 양식이 다를 경우 후순위로
+          };
+          var valA = parseClass(a.studentInfo);
+          var valB = parseClass(b.studentInfo);
+
+          if (valA !== valB) return valA - valB; // 오름차순 (1학년 1반 1번부터)
+          return a.originalIndex - b.originalIndex; // 학급이 같으면 최신순
+
+        } else if (sortType === 'likes') {
+          // 좋아요 개수 계산
+          var likesA = a.likes ? a.likes.split(',').filter(Boolean).length : 0;
+          var likesB = b.likes ? b.likes.split(',').filter(Boolean).length : 0;
+
+          if (likesA !== likesB) return likesB - likesA; // 내림차순 (좋아요 많은 것부터)
+          return a.originalIndex - b.originalIndex; // 좋아요 수가 같으면 최신순
+
+        } else {
+          // default: 'latest' (제출 최신순 - 초기 데이터 배열 순서)
+          return a.originalIndex - b.originalIndex;
+        }
+      });
+
+      // 결과 렌더링
+      renderGallery(filteredProjects);
+    }
+  </script>
+</body>
+</html>

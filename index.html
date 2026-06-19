@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>학생 작품 제출 시스템</title>
+  <style>
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f6f9; color: #333; margin: 0; padding: 20px; }
+    .container { max-width: 600px; margin: 0 auto; background: #ffffff; padding: 30px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+    h2 { color: #2c3e50; margin-top: 0; border-bottom: 2px solid #3498db; padding-bottom: 10px; }
+    .notice { background-color: #e8f4fd; border-left: 4px solid #3498db; padding: 12px; margin-bottom: 20px; font-size: 13.5px; line-height: 1.5; border-radius: 0 4px 4px 0; }
+    .form-group { margin-bottom: 20px; }
+    label { display: block; font-weight: 600; margin-bottom: 8px; color: #34495e; }
+    .description { font-size: 12px; color: #7f8c8d; margin-top: -4px; margin-bottom: 8px; }
+    select, input[type="text"], textarea { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; font-size: 14px; }
+    select:focus, input[type="text"]:focus, textarea:focus { border-color: #3498db; outline: none; }
+    textarea { height: 150px; font-family: monospace; }
+    button { background-color: #3498db; color: white; padding: 12px 20px; border: none; border-radius: 6px; cursor: pointer; font-size: 16px; font-weight: bold; width: 100%; transition: background 0.2s; }
+    button:hover { background-color: #2980b9; }
+    button:disabled { background-color: #bdc3c7; cursor: not-allowed; }
+    #loading { display: none; text-align: center; margin-top: 15px; font-weight: bold; color: #3498db; }
+  </style>
+</head>
+<body>
+<div class="container">
+  <h2>💻 코딩 작품 제출 사이트</h2>
+  <div class="notice">
+    🔒 본 시스템은 이메일을 수집하지 않습니다.<br>
+    ⚠️ 코드가 너무 길어 복사/붙여넣기 시 오류가 발생하면, 메모장에 붙여넣고 <strong>[이름_작품명.txt]</strong>로 저장하여 7번 문항에 첨부해 주세요.
+  </div>
+  <form id="submissionForm" onsubmit="handleFormSubmit(this); return false;">
+    <div class="form-group">
+      <label for="grade">1. 학년</label>
+      <select name="grade" id="grade" required>
+        <option value="">선택하세요</option>
+        <option value="1">1학년</option>
+        <option value="2">2학년</option>
+        <option value="3">3학년</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label for="classNo">2. 반</label>
+      <select name="classNo" id="classNo" required>
+        <option value="">선택하세요</option>
+        <option value="1">1반</option><option value="2">2반</option>
+        <option value="3">3반</option><option value="4">4반</option><option value="5">5반</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label for="number">3. 번호</label>
+      <select name="number" id="number" required>
+        <option value="">선택하세요</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label for="studentName">4. 이름</label>
+      <input type="text" name="studentName" id="studentName" placeholder="홍길동" required>
+    </div>
+    <div class="form-group">
+      <label for="projectName">5. 작품명</label>
+      <input type="text" name="projectName" id="projectName" placeholder="예: 나만의 행성 소개 페이지" required>
+    </div>
+    <div class="form-group">
+      <label for="codeText">6. 여기에 코드를 붙여넣으세요.</label>
+      <div class="description">(짧은 코드는 바로 붙여넣고, 길면 비워두고 7번에 파일로 제출하세요)</div>
+      <textarea name="codeText" id="codeText" placeholder="<html> ... </html>"></textarea>
+    </div>
+    <div class="form-group">
+      <label for="txtFile">7. 여기에 txt파일을 첨부하세요.</label>
+      <div class="description">(크롬북 메모장 저장. 파일 이름 규칙: 이름_작품명.txt)</div>
+      <input type="file" name="txtFile" id="txtFile" accept=".txt,.html">
+    </div>
+    <button type="submit" id="submitBtn">작품 제출하기</button>
+    <div id="loading">🚀 작품을 서버로 전송 중입니다. 잠시만 기다려 주세요...</div>
+  </form>
+</div>
+
+<script>
+  window.onload = function() {
+    var numberSelect = document.getElementById('number');
+    for (var i = 1; i <= 30; i++) {
+      var option = document.createElement('option');
+      option.value = i;
+      option.textContent = i + '번';
+      numberSelect.appendChild(option);
+    }
+  };
+
+  function handleFormSubmit(formObject) {
+    var codeText = document.getElementById('codeText').value.trim();
+    var fileInput = document.getElementById('txtFile').files.length;
+    if (!codeText && fileInput === 0) {
+      alert('⚠️ 6번 문항에 코드를 붙여넣거나, 7번 문항에 파일을 첨부해야 합니다!');
+      return;
+    }
+    document.getElementById('submitBtn').disabled = true;
+    document.getElementById('loading').style.display = 'block';
+    google.script.run
+      .withSuccessHandler(function(response) {
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('submitBtn').disabled = false;
+        if (response.success) {
+          alert(response.message);
+          document.getElementById('submissionForm').reset();
+        } else alert('❌ 제출 실패: ' + response.message);
+      })
+      .withFailureHandler(function(error) {
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('submitBtn').disabled = false;
+        alert('❌ 시스템 오류: ' + error.toString());
+      })
+      .processForm(formObject);
+  }
+</script>
+</body>
+</html>
