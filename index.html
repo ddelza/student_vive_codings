@@ -29,7 +29,7 @@
     🔒 본 시스템은 이메일을 수집하지 않습니다.<br>
     ⚠️ 코드가 너무 길어 복사/붙여넣기 시 오류가 발생하면, 메모장에 붙여넣고 <strong>[이름_작품명.txt]</strong>로 저장하여 7번 문항에 첨부해 주세요.
   </div>
-  <form id="submissionForm" onsubmit="handleFormSubmit(this); return false;">
+  <form id="submissionForm" onsubmit="handleFormSubmit(event); return false;">
     <div class="form-group">
       <label for="grade">1. 학년</label>
       <select name="grade" id="grade" required>
@@ -77,6 +77,8 @@
 </div>
 
 <script>
+  var GAS_URL = "https://script.google.com/macros/s/AKfycbzyeRDa2Swq71UlKMysPkDRxviqf6qTHNAJvwVRZxbT0d5KKn9_H2ehU8WU8xjjUzNeoQ/exec";
+
   window.onload = function() {
     var numberSelect = document.getElementById('number');
     for (var i = 1; i <= 30; i++) {
@@ -87,30 +89,82 @@
     }
   };
 
-  function handleFormSubmit(formObject) {
-    var codeText = document.getElementById('codeText').value.trim();
-    var fileInput = document.getElementById('txtFile').files.length;
-    if (!codeText && fileInput === 0) {
+  function setLoading(on) {
+    document.getElementById('submitBtn').disabled = on;
+    document.getElementById('loading').style.display = on ? 'block' : 'none';
+  }
+
+  function onSuccess(response) {
+    setLoading(false);
+    if (response.success) {
+      alert(response.message);
+      document.getElementById('submissionForm').reset();
+    } else {
+      alert('❌ 제출 실패: ' + response.message);
+    }
+  }
+
+  function onError(err) {
+    setLoading(false);
+    alert('❌ 시스템 오류: ' + (err.message || err.toString()));
+  }
+
+  function handleFormSubmit(event) {
+    var codeText  = document.getElementById('codeText').value.trim();
+    var fileInput = document.getElementById('txtFile');
+    var file      = fileInput.files[0];
+
+    if (!codeText && !file) {
       alert('⚠️ 6번 문항에 코드를 붙여넣거나, 7번 문항에 파일을 첨부해야 합니다!');
       return;
     }
-    document.getElementById('submitBtn').disabled = true;
-    document.getElementById('loading').style.display = 'block';
-    google.script.run
-      .withSuccessHandler(function(response) {
-        document.getElementById('loading').style.display = 'none';
-        document.getElementById('submitBtn').disabled = false;
-        if (response.success) {
-          alert(response.message);
-          document.getElementById('submissionForm').reset();
-        } else alert('❌ 제출 실패: ' + response.message);
-      })
-      .withFailureHandler(function(error) {
-        document.getElementById('loading').style.display = 'none';
-        document.getElementById('submitBtn').disabled = false;
-        alert('❌ 시스템 오류: ' + error.toString());
-      })
-      .processForm(formObject);
+
+    setLoading(true);
+
+    var payload = {
+      action:      'submitProject',
+      grade:       document.getElementById('grade').value,
+      classNo:     document.getElementById('classNo').value,
+      number:      document.getElementById('number').value,
+      studentName: document.getElementById('studentName').value,
+      projectName: document.getElementById('projectName').value,
+      codeText:    codeText
+    };
+
+    if (typeof google !== 'undefined' && google.script) {
+      // GAS 내부 환경 — 기존 방식 유지 (파일 객체 직접 전달 가능)
+      google.script.run
+        .withSuccessHandler(onSuccess)
+        .withFailureHandler(onError)
+        .processForm(new FormData(event.target || document.getElementById('submissionForm')));
+      return;
+    }
+
+    // GitHub Pages 환경 — fetch 사용
+    if (file) {
+      // 파일을 base64로 변환 후 전송
+      var reader = new FileReader();
+      reader.onload = function(e) {
+        // data:text/plain;base64,XXXX 에서 base64 부분만 추출
+        payload.fileBase64 = e.target.result.split(',')[1];
+        payload.fileName   = file.name;
+        sendPayload(payload);
+      };
+      reader.readAsDataURL(file);
+    } else {
+      sendPayload(payload);
+    }
+  }
+
+  function sendPayload(payload) {
+    fetch(GAS_URL, {
+      method:  'POST',
+      body:    JSON.stringify(payload),
+      headers: { 'Content-Type': 'text/plain' }
+    })
+    .then(function(r) { return r.json(); })
+    .then(onSuccess)
+    .catch(onError);
   }
 </script>
 </body>
