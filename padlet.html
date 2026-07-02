@@ -280,9 +280,13 @@ function login() {
   var msg = document.getElementById('loginMsg');
   if (!id || !name) { msg.textContent = '학번(또는 0000)과 이름을 모두 입력해주세요.'; return; }
 
-  studentId = id; studentName = name;
-  localStorage.setItem('dgs_padlet_login', JSON.stringify({ id: id, name: name }));
-  enterBoard();
+  msg.textContent = '확인 중...';
+  apiGet({ action: 'verifyPadletLogin', studentId: id, studentName: name }).then(function (res) {
+    if (!res.valid) { msg.textContent = '학번 또는 이름이 명단과 일치하지 않습니다. 다시 확인해주세요.'; return; }
+    studentId = id; studentName = name;
+    localStorage.setItem('dgs_padlet_login', JSON.stringify({ id: id, name: name }));
+    enterBoard();
+  }).catch(function () { msg.textContent = '서버 연결에 실패했습니다. 잠시 후 다시 시도해주세요.'; });
 }
 
 function enterBoard() {
