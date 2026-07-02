@@ -13,6 +13,8 @@
     --idea: #7c3aed;
     --complaint: #d9822b;
     --ask: #1f8a4c;
+    --disclosure: #0f7a9b;
+    --tips: #c9971b;
     --text: #1c2238;
     --sub: #6b7384;
   }
@@ -65,6 +67,8 @@
   .col-header.idea { background: var(--idea); }
   .col-header.complaint { background: var(--complaint); }
   .col-header.ask { background: var(--ask); }
+  .col-header.disclosure { background: var(--disclosure); }
+  .col-header.tips { background: var(--tips); }
   .col-header-top { display: flex; justify-content: space-between; align-items: center; font-weight: bold; }
   .col-count { font-size: 12px; font-weight: normal; opacity: .85; }
   .col-desc { font-size: 11.5px; font-weight: normal; opacity: .92; margin-top: 4px; line-height: 1.4; }
@@ -76,16 +80,21 @@
   .post-card.board-idea { background: #ece3fb; border-color: #cdb6f0; }
   .post-card.board-complaint { background: #ffe6cf; border-color: #f3b97a; }
   .post-card.board-ask { background: #eaf6d6; border-color: #c9e08f; }
+  .post-card.board-disclosure { background: #dcf0f7; border-color: #9ed6e8; }
+  .post-card.board-tips { background: #fdf0d1; border-color: #edcf7a; }
   .post-card.teacher-post { background: #ffe6f0; border-color: #f5b8d2; }
 
   .type-badge { font-size: 10.5px; font-weight: bold; border-radius: 999px; padding: 2px 7px; margin-left: 5px; white-space: nowrap; }
   .type-badge.학생 { color: #3a4a7a; background: #e8edfb; }
   .type-badge.학부모 { color: #0e7c6b; background: #d6f5f0; }
   .type-badge.교사 { color: #c0276b; background: #ffd5e8; }
+  .id-tag { font-size: 11px; color: var(--sub); font-weight: normal; }
 
   .comment-item.board-idea { background: #ece3fb; border-radius: 6px; padding: 4px 6px; }
   .comment-item.board-complaint { background: #ffe6cf; border-radius: 6px; padding: 4px 6px; }
   .comment-item.board-ask { background: #eaf6d6; border-radius: 6px; padding: 4px 6px; }
+  .comment-item.board-disclosure { background: #dcf0f7; border-radius: 6px; padding: 4px 6px; }
+  .comment-item.board-tips { background: #fdf0d1; border-radius: 6px; padding: 4px 6px; }
   .comment-item.teacher-comment { background: #ffe6f0; border-radius: 6px; padding: 4px 6px; }
 
   .post-meta { font-size: 11.5px; color: var(--sub); margin-bottom: 6px; }
@@ -225,7 +234,9 @@ var TEACHER_ID = '0000';
 var BOARDS = [
   { key: 'idea', cls: 'idea', emoji: '💡', title: '아이디어', desc: '학교에 도움이 될 바이브코딩 아이디어를 자유롭게 올려주세요.', placeholder: '예) 급식 메뉴를 별점으로 평가하는 투표 앱을 만들면 좋겠어요.' },
   { key: 'complaint', cls: 'complaint', emoji: '🤔', title: '불편함 나누기', desc: '학생·학부모·교사 누구나! 학교생활 속 불편한 점을 나눠주세요.', placeholder: '예) 상담 예약을 문자로만 받다 보니 놓치는 경우가 많아요.' },
-  { key: 'ask', cls: 'ask', emoji: '🙋', title: '병선샘께 기술 자문 (질문하기)', desc: '코딩하다 막힌 부분을 병선 선생님께 질문해보세요.', placeholder: '예) 구글 시트와 앱스 스크립트를 연결할 때 자꾸 오류가 나요. 어떻게 해결하나요?' }
+  { key: 'ask', cls: 'ask', emoji: '🙋', title: '병선샘께 기술 자문 (질문하기)', desc: '코딩하다 막힌 부분을 병선 선생님께 질문해보세요.', placeholder: '예) 구글 시트와 앱스 스크립트를 연결할 때 자꾸 오류가 나요. 어떻게 해결하나요?' },
+  { key: 'disclosure', cls: 'disclosure', emoji: '📋', title: '정보공개 요청', desc: '학교에 공개를 요청하고 싶은 정보가 있다면 남겨주세요.', placeholder: '예) 급식 식재료 원산지 정보를 알고 싶어요.' },
+  { key: 'tips', cls: 'tips', emoji: '💻', title: '코딩 팁공유', desc: '바이브코딩하며 알게 된 유용한 팁이나 프롬프트를 공유해보세요.', placeholder: '예) 구글 시트 함수랑 앱스 스크립트를 이렇게 연결하면 편해요!' }
 ];
 
 var studentId = '';
@@ -349,6 +360,10 @@ function typeBadge(type) {
   if (!type) return '';
   return ' <span class="type-badge ' + escapeHtml(type) + '">' + escapeHtml(type) + '</span>';
 }
+// 학생은 학번을 함께 표시하고, 교사(0000)는 학번을 표시하지 않는다.
+function idTag(id, isTeacherFlag) {
+  return isTeacherFlag ? '' : ' <span class="id-tag">(' + escapeHtml(id) + ')</span>';
+}
 function cardBoardClass(post) {
   return post.isTeacher ? 'teacher-post' : 'board-' + post.board;
 }
@@ -380,11 +395,11 @@ function renderComments(post) {
   return topLevel.map(function (c) {
     var replies = post.comments.filter(function (r) { return r.parentId === c.id; });
     var html = '<div class="comment-item ' + commentBoardClass(post, c) + '">💬 <b>' + escapeHtml(c.studentName) + '</b>' +
-      (c.isTeacher ? typeBadge('교사') : '') + ': ' + escapeHtml(c.text) + '<span class="ctime">' + escapeHtml(c.time) + '</span> ' +
+      idTag(c.studentId, c.isTeacher) + (c.isTeacher ? typeBadge('교사') : '') + ': ' + escapeHtml(c.text) + '<span class="ctime">' + escapeHtml(c.time) + '</span> ' +
       renderCommentActions(post, c) + '</div>';
     html += replies.map(function (r) {
       return '<div class="comment-item reply ' + commentBoardClass(post, r) + '">↳ <b>' + escapeHtml(r.studentName) + '</b>' +
-        (r.isTeacher ? typeBadge('교사') : '') + ': ' + escapeHtml(r.text) + '<span class="ctime">' + escapeHtml(r.time) + '</span> ' +
+        idTag(r.studentId, r.isTeacher) + (r.isTeacher ? typeBadge('교사') : '') + ': ' + escapeHtml(r.text) + '<span class="ctime">' + escapeHtml(r.time) + '</span> ' +
         renderCommentActions(post, r) + '</div>';
     }).join('');
     html += renderReplyBox(post, c.id);
@@ -412,7 +427,7 @@ function renderPostCard(post) {
   var titleHtml = post.title ? '<div class="post-title">' + escapeHtml(post.title) + '</div>' : '';
 
   return '<div class="post-card ' + cardBoardClass(post) + '">' +
-    '<div class="post-meta"><b>' + escapeHtml(post.authorName) + '</b>' + typeBadge(post.authorType) + ' · ' + escapeHtml(post.timestamp) + editLink + '</div>' +
+    '<div class="post-meta"><b>' + escapeHtml(post.authorName) + '</b>' + idTag(post.authorId, post.isTeacher) + typeBadge(post.authorType) + ' · ' + escapeHtml(post.timestamp) + editLink + '</div>' +
     titleHtml +
     '<div class="post-text">' + escapeHtml(post.content) + '</div>' +
     '<div class="reaction-row">' +
