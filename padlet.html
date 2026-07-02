@@ -15,6 +15,7 @@
     --ask: #1f8a4c;
     --disclosure: #0f7a9b;
     --tips: #c9971b;
+    --link: #5a6b8c;
     --text: #1c2238;
     --sub: #6b7384;
   }
@@ -61,6 +62,11 @@
   }
   #adminBtn:hover { background: #e2e6f0; }
   #adminBtn.on { background: #2c2f3a; color: #fff; border-color: #2c2f3a; }
+  .header-link-btn {
+    font-size: 12px; font-weight: bold; color: var(--accent); background: #eaf1ff; border: 1px solid #d3e2fb;
+    border-radius: 999px; padding: 6px 12px; text-decoration: none; white-space: nowrap;
+  }
+  .header-link-btn:hover { background: #dde9fd; }
   .pin-badge { font-size: 10.5px; font-weight: bold; color: #a8590a; background: #ffe3b8; border-radius: 999px; padding: 2px 7px; margin-left: 5px; }
 
   /* ===== 보드(3열) ===== */
@@ -76,6 +82,7 @@
   .col-header.ask { background: var(--ask); }
   .col-header.disclosure { background: var(--disclosure); }
   .col-header.tips { background: var(--tips); }
+  .col-header.link { background: var(--link); }
   .col-header-top { display: flex; justify-content: space-between; align-items: center; font-weight: bold; }
   .col-count { font-size: 12px; font-weight: normal; opacity: .85; }
   .col-desc { font-size: 11.5px; font-weight: normal; opacity: .92; margin-top: 4px; line-height: 1.4; }
@@ -89,6 +96,7 @@
   .post-card.board-ask { background: #eaf6d6; border-color: #c9e08f; }
   .post-card.board-disclosure { background: #dcf0f7; border-color: #9ed6e8; }
   .post-card.board-tips { background: #fdf0d1; border-color: #edcf7a; }
+  .post-card.board-link { background: #e8eaf2; border-color: #c3c9db; }
   .post-card.teacher-post { background: #ffe6f0; border-color: #f5b8d2; }
 
   .type-badge { font-size: 10.5px; font-weight: bold; border-radius: 999px; padding: 2px 7px; margin-left: 5px; white-space: nowrap; }
@@ -102,12 +110,14 @@
   .comment-item.board-ask { background: #eaf6d6; border-radius: 6px; padding: 4px 6px; }
   .comment-item.board-disclosure { background: #dcf0f7; border-radius: 6px; padding: 4px 6px; }
   .comment-item.board-tips { background: #fdf0d1; border-radius: 6px; padding: 4px 6px; }
+  .comment-item.board-link { background: #e8eaf2; border-radius: 6px; padding: 4px 6px; }
   .comment-item.teacher-comment { background: #ffe6f0; border-radius: 6px; padding: 4px 6px; }
 
   .post-meta { font-size: 11.5px; color: var(--sub); margin-bottom: 6px; }
   .post-meta b { color: var(--text); }
   .post-title { font-size: 14.5px; font-weight: bold; margin-top: 4px; }
   .post-text { font-size: 13.5px; line-height: 1.55; margin-top: 4px; white-space: pre-wrap; word-break: break-word; }
+  .post-text a { color: var(--accent); word-break: break-all; }
 
   .reaction-row { display: flex; gap: 8px; margin-top: 10px; }
   .react-btn {
@@ -216,7 +226,9 @@
       <h1>🗂️ 디지털 시민성 바이브코딩 아이디어 패들렛
         <span>전교생·학부모·선생님 누구나 참여할 수 있는 학교 전체 게시판입니다.</span>
       </h1>
-      <div id="headerRight" style="display:flex;align-items:center;">
+      <div id="headerRight" style="display:flex;align-items:center;flex-wrap:wrap;gap:8px;">
+        <a class="header-link-btn" href="https://ddelza.github.io/student_vive_codings/" target="_blank" rel="noopener">📤 제출링크</a>
+        <a class="header-link-btn" href="https://ddelza.github.io/student_vive_codings/gallery.html" target="_blank" rel="noopener">🖼️ 친구들 작품 보기</a>
         <div id="whoami"></div>
         <button id="adminBtn" onclick="onAdminBtnClick()">🔐 관리자모드</button>
       </div>
@@ -277,7 +289,8 @@ var BOARDS = [
   { key: 'complaint', cls: 'complaint', emoji: '🤔', title: '불편함 나누기', desc: '학생·학부모·교사 누구나! 학교생활 속 불편한 점을 나눠주세요.', placeholder: '예) 상담 예약을 문자로만 받다 보니 놓치는 경우가 많아요.' },
   { key: 'ask', cls: 'ask', emoji: '🙋', title: '병선샘께 기술 자문 (질문하기)', desc: '코딩하다 막힌 부분을 병선 선생님께 질문해보세요.', placeholder: '예) 구글 시트와 앱스 스크립트를 연결할 때 자꾸 오류가 나요. 어떻게 해결하나요?' },
   { key: 'disclosure', cls: 'disclosure', emoji: '📋', title: '정보공개 요청', desc: '학교에 공개를 요청하고 싶은 정보가 있다면 남겨주세요.', placeholder: '예) 급식 식재료 원산지 정보를 알고 싶어요.' },
-  { key: 'tips', cls: 'tips', emoji: '💻', title: '코딩 팁공유', desc: '바이브코딩하며 알게 된 유용한 팁이나 프롬프트를 공유해보세요.', placeholder: '예) 구글 시트 함수랑 앱스 스크립트를 이렇게 연결하면 편해요!' }
+  { key: 'tips', cls: 'tips', emoji: '💻', title: '코딩 팁공유', desc: '바이브코딩하며 알게 된 유용한 팁이나 프롬프트를 공유해보세요.', placeholder: '예) 구글 시트 함수랑 앱스 스크립트를 이렇게 연결하면 편해요!' },
+  { key: 'link', cls: 'link', emoji: '🔗', title: '링크가 있다면 여기에도 올려주세요', desc: '내가 만든 사이트나 유용한 링크가 있다면 자유롭게 공유해주세요.', placeholder: '예) 내가 만든 방명록 앱: https://내아이디.github.io/내사이트/' }
 ];
 
 var studentId = '';
@@ -322,6 +335,12 @@ function escapeHtml(s) {
   return String(s == null ? '' : s)
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+// escapeHtml로 이스케이프한 뒤 URL 패턴만 클릭 가능한 링크로 바꿔줌 (링크 공유 게시판 등에서 필요)
+function linkify(s) {
+  return escapeHtml(s).replace(/(https?:\/\/[^\s<]+)/g, function (url) {
+    return '<a href="' + url + '" target="_blank" rel="noopener">' + url + '</a>';
+  });
 }
 function boardMeta(key) {
   for (var i = 0; i < BOARDS.length; i++) if (BOARDS[i].key === key) return BOARDS[i];
@@ -535,7 +554,7 @@ function renderPostCard(post) {
     ? '<div class="like-tooltip">' + post.likerNames.map(escapeHtml).join(', ') + '</div>'
     : '';
   var bodyRest = bodyOpen
-    ? '<div class="post-text">' + escapeHtml(post.content) + '</div>' +
+    ? '<div class="post-text">' + linkify(post.content) + '</div>' +
       '<div class="reaction-row">' +
         '<span class="like-wrap">' +
           '<button class="react-btn' + (post.myLiked ? ' active' : '') + '" onclick="toggleLike(\'' + post.id + '\')">👍 좋아요 ' + post.likeCount + '</button>' +
