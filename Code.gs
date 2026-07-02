@@ -1,5 +1,7 @@
 var GAS_URL = "https://script.google.com/macros/s/AKfycbzyeRDa2Swq71UlKMysPkDRxviqf6qTHNAJvwVRZxbT0d5KKn9_H2ehU8WU8xjjUzNeoQ/exec";
 var SHEET_ID = "19MC5UCVgJWCNTDk83g0Af30iUkDX7s6pXwZGWIHu6-w";
+var PADLET_ROSTER_SHEET_ID = "1yvm2kKox1CenK2VLJ43HOF3Ik4spWxd9D87A6upHClU"; // 전교생 학번/성명 명단 (padlet 로그인 검증용)
+var PADLET_ROSTER_GID = 62759410; // 명단이 들어있는 탭의 gid
 
 function doGet(e) {
   var page   = (e && e.parameter) ? e.parameter.page   : '';
@@ -15,6 +17,12 @@ function doGet(e) {
   if (action === 'getPadletPosts') {
     return ContentService
       .createTextOutput(JSON.stringify(getPadletPosts(e.parameter.studentId, e.parameter.studentName)))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+
+  if (action === 'verifyPadletLogin') {
+    return ContentService
+      .createTextOutput(JSON.stringify({ valid: verifyPadletStudent_(e.parameter.studentId, e.parameter.studentName) }))
       .setMimeType(ContentService.MimeType.JSON);
   }
 
@@ -208,6 +216,40 @@ function padletIsTeacher_(id) {
   return String(id || '').trim() === PADLET_TEACHER_ID;
 }
 
+function padletNormalize_(s) {
+  return String(s || '').replace(/\s+/g, '');
+}
+
+// 명단 탭을 이름이 아니라 gid(탭 고유ID)로 찾음 — 탭 이름이 바뀌어도 안전하게 동작
+function getPadletRosterSheet_() {
+  var ss = SpreadsheetApp.openById(PADLET_ROSTER_SHEET_ID);
+  var sheets = ss.getSheets();
+  for (var i = 0; i < sheets.length; i++) {
+    if (sheets[i].getSheetId() === PADLET_ROSTER_GID) return sheets[i];
+  }
+  return sheets[0];
+}
+
+// 학번+이름이 전교생 명단과 일치하는지 확인 (교사 계정 '0000'은 명단 검증 없이 통과)
+function verifyPadletStudent_(studentId, studentName) {
+  if (padletIsTeacher_(studentId)) return true;
+
+  var id = String(studentId || '').trim();
+  var name = padletNormalize_(studentName);
+  if (!id || !name) return false;
+
+  var sheet = getPadletRosterSheet_();
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 2) return false;
+  var data = sheet.getRange(2, 1, lastRow - 1, 2).getValues(); // A열: 학번, B열: 성명
+  for (var i = 0; i < data.length; i++) {
+    if (String(data[i][0]).trim() === id) {
+      return padletNormalize_(data[i][1]) === name;
+    }
+  }
+  return false;
+}
+
 // 게시ID로 행 번호를 찾을 때 ID열(A열)만 읽음 — 댓글이 쌓여 행이 커져도 조회 속도가 느려지지 않게 함
 function findPadletRow_(sheet, postId) {
   var lastRow = sheet.getLastRow();
@@ -264,6 +306,9 @@ function submitPadletPost(data) {
   if (!studentId || !studentName) {
     return { success: false, message: '학번(또는 0000)과 이름을 입력해주세요.' };
   }
+  if (!verifyPadletStudent_(studentId, studentName)) {
+    return { success: false, message: '학번 또는 이름이 명단과 일치하지 않습니다.' };
+  }
   if (PADLET_BOARDS.indexOf(data.board) === -1) {
     return { success: false, message: '파트를 올바르게 선택해주세요.' };
   }
@@ -293,6 +338,9 @@ function submitPadletPost(data) {
 function editPadletPost(data) {
   var studentId = String(data.studentId || '').trim();
   var studentName = String(data.studentName || '').trim();
+  if (!verifyPadletStudent_(studentId, studentName)) {
+    return { success: false, message: '학번 또는 이름이 명단과 일치하지 않습니다.' };
+  }
   if (!data.content || data.content.trim().length < 3) {
     return { success: false, message: '내용을 3자 이상 작성해주세요.' };
   }
@@ -318,8 +366,8 @@ function editPadletPost(data) {
 function togglePadletReaction(data) {
   var studentId = String(data.studentId || '').trim();
   var studentName = String(data.studentName || '').trim();
-  if (!studentId || !studentName) {
-    return { success: false, message: '로그인 정보가 없습니다.' };
+  if (!verifyPadletStudent_(studentId, studentName)) {
+    return { success: false, message: '학번 또는 이름이 명단과 일치하지 않습니다.' };
   }
 
   var sheet = getPadletSheet_();
@@ -349,8 +397,8 @@ function togglePadletReaction(data) {
 function addPadletComment(data) {
   var studentId = String(data.studentId || '').trim();
   var studentName = String(data.studentName || '').trim();
-  if (!studentId || !studentName) {
-    return { success: false, message: '로그인 정보가 없습니다.' };
+  if (!verifyPadletStudent_(studentId, studentName)) {
+    return { success: false, message: '학번 또는 이름이 명단과 일치하지 않습니다.' };
   }
   if (!data.text || data.text.trim().length < 1) {
     return { success: false, message: '댓글 내용을 입력해주세요.' };
@@ -387,6 +435,9 @@ function addPadletComment(data) {
 function deletePadletComment(data) {
   var studentId = String(data.studentId || '').trim();
   var studentName = String(data.studentName || '').trim();
+  if (!verifyPadletStudent_(studentId, studentName)) {
+    return { success: false, message: '학번 또는 이름이 명단과 일치하지 않습니다.' };
+  }
   var myKey = padletAuthorKey_(studentId, studentName);
 
   var sheet = getPadletSheet_();
