@@ -184,7 +184,7 @@ function saveFile(fileBlob) {
 // ===================== padlet.html (디지털 시민성 바이브코딩 아이디어 패들렛) =====================
 // 학번/이름은 별도 명단으로 검증하지 않고 그대로 받아 기록한다(전교 대상, 교사는 학번란에 0000 입력).
 var PADLET_SHEET_NAME = '디지털시민성패들렛';
-var PADLET_BOARDS = ['idea', 'complaint', 'ask'];
+var PADLET_BOARDS = ['idea', 'complaint', 'ask', 'disclosure', 'tips'];
 var PADLET_TEACHER_ID = '0000';
 
 function getPadletSheet_() {
