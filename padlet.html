@@ -116,6 +116,14 @@
   }
   .react-btn:hover { background: #eef1f8; }
   .react-btn.active { background: #ffe9e9; border-color: #f08a8a; color: #c0392b; }
+  .like-wrap { position: relative; display: inline-block; }
+  .like-tooltip {
+    display: none; position: absolute; bottom: calc(100% + 6px); left: 0; z-index: 30;
+    background: #2c2f3a; color: #fff; font-size: 11.5px; line-height: 1.5; white-space: nowrap;
+    border-radius: 8px; padding: 7px 10px; box-shadow: 0 4px 14px rgba(0,0,0,.2);
+    max-width: 220px; white-space: normal;
+  }
+  .like-wrap:hover .like-tooltip { display: block; }
 
   .comment-toggle { font-size: 12px; color: var(--accent); cursor: pointer; margin-top: 9px; display: inline-block; }
   .comment-box { margin-top: 8px; border-top: 1px dashed var(--line); padding-top: 8px; }
@@ -514,16 +522,23 @@ function renderPostCard(post) {
   var pinBadge = post.pinned ? ' <span class="pin-badge">📌 고정</span>' : '';
   var titleHtml = post.title ? '<div class="post-title">' + escapeHtml(post.title) + pinBadge + '</div>' : (post.pinned ? '<div class="post-title">' + pinBadge + '</div>' : '');
 
-  // 제목이 있는 글(주로 안내/매뉴얼)만 기본적으로 내용을 접어서, 제목만 보고 필요할 때 펼쳐 읽게 한다.
-  var hasTitle = !!post.title;
-  var bodyOpen = !hasTitle || !!expandedPostBody[post.id];
-  var bodyToggle = hasTitle
+  // 팁공유 게시판의 제목 있는 글(주로 안내/매뉴얼)만 기본적으로 내용을 접어서,
+  // 제목만 보고 필요할 때 펼쳐 읽게 한다. 다른 게시판은 항상 펼쳐서 보여준다.
+  var collapsible = post.board === 'tips' && !!post.title;
+  var bodyOpen = !collapsible || !!expandedPostBody[post.id];
+  var bodyToggle = collapsible
     ? '<div class="comment-toggle" onclick="toggleBody(\'' + post.id + '\')">' + (bodyOpen ? '📄 내용 접기 ▲' : '📄 내용 펼쳐서 보기 ▼') + '</div>'
+    : '';
+  var likerTooltip = (post.likerNames && post.likerNames.length)
+    ? '<div class="like-tooltip">' + post.likerNames.map(escapeHtml).join(', ') + '</div>'
     : '';
   var bodyRest = bodyOpen
     ? '<div class="post-text">' + escapeHtml(post.content) + '</div>' +
       '<div class="reaction-row">' +
-        '<button class="react-btn' + (post.myLiked ? ' active' : '') + '" onclick="toggleLike(\'' + post.id + '\')">👍 좋아요 ' + post.likeCount + '</button>' +
+        '<span class="like-wrap">' +
+          '<button class="react-btn' + (post.myLiked ? ' active' : '') + '" onclick="toggleLike(\'' + post.id + '\')">👍 좋아요 ' + post.likeCount + '</button>' +
+          likerTooltip +
+        '</span>' +
       '</div>' +
       '<div class="comment-toggle" onclick="toggleComments(\'' + post.id + '\')">💬 댓글 ' + totalCommentCount + '개 ' + (expanded ? '숨기기 ▲' : '보기 ▼') + '</div>' +
       commentsHtml
