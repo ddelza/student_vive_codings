@@ -78,8 +78,6 @@
   .col-header.tips { background: var(--tips); }
   .col-header-top { display: flex; justify-content: space-between; align-items: center; font-weight: bold; }
   .col-count { font-size: 12px; font-weight: normal; opacity: .85; }
-  .col-toggle { font-size: 11.5px; font-weight: normal; opacity: .95; cursor: pointer; white-space: nowrap; background: rgba(255,255,255,.18); border-radius: 999px; padding: 3px 9px; }
-  .col-toggle:hover { background: rgba(255,255,255,.3); }
   .col-desc { font-size: 11.5px; font-weight: normal; opacity: .92; margin-top: 4px; line-height: 1.4; }
 
   .post-card {
@@ -281,6 +279,7 @@ var isAdmin = false;
 var adminPassword = '';
 var currentPosts = [];
 var expandedComments = {};
+var expandedPostBody = {}; // 제목 있는 글은 기본적으로 내용을 접어두고, 눌러야 펼쳐짐
 var expandedReplyFor = {};
 var composing = false;
 var lastPostsJson = '';
@@ -412,41 +411,18 @@ function updateAdminBtn() {
 })();
 
 // ===================== 게시판 렌더 =====================
-// 기본적으로 접어둘 게시판 (펼쳐야 글이 보임)
-var collapsedBoards = { tips: true };
-
-function toggleColumnCollapse(key) {
-  collapsedBoards[key] = !collapsedBoards[key];
-  updateColumnCollapseUI(key);
-}
-
-function updateColumnCollapseUI(key) {
-  var meta = boardMeta(key);
-  var collapsed = !!collapsedBoards[key];
-  var postsEl = document.getElementById('posts-' + meta.cls);
-  var toggleEl = document.getElementById('toggle-' + meta.cls);
-  if (postsEl) postsEl.style.display = collapsed ? 'none' : '';
-  if (toggleEl) toggleEl.textContent = collapsed ? '▸ 펼치기' : '▾ 접기';
-}
-
 function renderColumnsShell() {
   var board = document.getElementById('board');
   board.innerHTML = BOARDS.map(function (b) {
     return '<div class="column" data-key="' + b.key + '">' +
-      '<div class="col-header ' + b.cls + '">' +
-        '<div class="col-header-top">' +
-          '<span onclick="openModal(\'' + b.key + '\')" style="cursor:pointer;">' + b.emoji + ' ' + b.title + ' +</span>' +
-          '<span style="display:flex;align-items:center;gap:10px;">' +
-            '<span class="col-count" id="count-' + b.cls + '"></span>' +
-            '<span class="col-toggle" onclick="toggleColumnCollapse(\'' + b.key + '\')" id="toggle-' + b.cls + '"></span>' +
-          '</span>' +
-        '</div>' +
+      '<div class="col-header ' + b.cls + '" onclick="openModal(\'' + b.key + '\')">' +
+        '<div class="col-header-top"><span>' + b.emoji + ' ' + b.title + ' +</span>' +
+        '<span class="col-count" id="count-' + b.cls + '"></span></div>' +
         '<div class="col-desc">' + escapeHtml(b.desc) + '</div>' +
       '</div>' +
       '<div class="posts" id="posts-' + b.cls + '"></div>' +
     '</div>';
   }).join('');
-  BOARDS.forEach(function (b) { updateColumnCollapseUI(b.key); });
 }
 
 function renderBoard(posts) {
@@ -538,15 +514,26 @@ function renderPostCard(post) {
   var pinBadge = post.pinned ? ' <span class="pin-badge">📌 고정</span>' : '';
   var titleHtml = post.title ? '<div class="post-title">' + escapeHtml(post.title) + pinBadge + '</div>' : (post.pinned ? '<div class="post-title">' + pinBadge + '</div>' : '');
 
+  // 제목이 있는 글(주로 안내/매뉴얼)만 기본적으로 내용을 접어서, 제목만 보고 필요할 때 펼쳐 읽게 한다.
+  var hasTitle = !!post.title;
+  var bodyOpen = !hasTitle || !!expandedPostBody[post.id];
+  var bodyToggle = hasTitle
+    ? '<div class="comment-toggle" onclick="toggleBody(\'' + post.id + '\')">' + (bodyOpen ? '📄 내용 접기 ▲' : '📄 내용 펼쳐서 보기 ▼') + '</div>'
+    : '';
+  var bodyRest = bodyOpen
+    ? '<div class="post-text">' + escapeHtml(post.content) + '</div>' +
+      '<div class="reaction-row">' +
+        '<button class="react-btn' + (post.myLiked ? ' active' : '') + '" onclick="toggleLike(\'' + post.id + '\')">👍 좋아요 ' + post.likeCount + '</button>' +
+      '</div>' +
+      '<div class="comment-toggle" onclick="toggleComments(\'' + post.id + '\')">💬 댓글 ' + totalCommentCount + '개 ' + (expanded ? '숨기기 ▲' : '보기 ▼') + '</div>' +
+      commentsHtml
+    : '';
+
   return '<div class="post-card ' + cardBoardClass(post) + '">' +
     '<div class="post-meta"><b>' + escapeHtml(post.authorName) + '</b>' + idTag(post.authorId, post.isTeacher) + typeBadge(post.authorType) + ' · ' + escapeHtml(post.timestamp) + editLink + adminLinks + '</div>' +
     titleHtml +
-    '<div class="post-text">' + escapeHtml(post.content) + '</div>' +
-    '<div class="reaction-row">' +
-      '<button class="react-btn' + (post.myLiked ? ' active' : '') + '" onclick="toggleLike(\'' + post.id + '\')">👍 좋아요 ' + post.likeCount + '</button>' +
-    '</div>' +
-    '<div class="comment-toggle" onclick="toggleComments(\'' + post.id + '\')">💬 댓글 ' + totalCommentCount + '개 ' + (expanded ? '숨기기 ▲' : '보기 ▼') + '</div>' +
-    commentsHtml +
+    bodyToggle +
+    bodyRest +
   '</div>';
 }
 
@@ -666,6 +653,11 @@ function toggleLike(postId) {
 // ===================== 댓글 =====================
 function toggleComments(postId) {
   expandedComments[postId] = !expandedComments[postId];
+  renderBoard(currentPosts);
+}
+
+function toggleBody(postId) {
+  expandedPostBody[postId] = !expandedPostBody[postId];
   renderBoard(currentPosts);
 }
 
