@@ -518,14 +518,25 @@ function togglePadletPin(data) {
 }
 
 // 관리자 전용: 게시물 전체 삭제 (댓글 포함, 행 자체를 지움)
+// 본인(학번+이름 조합)이 작성한 게시물은 스스로 삭제 가능. 관리자 비밀번호가 맞으면 누구 글이든 삭제 가능.
 function deletePadletPost(data) {
-  if (!verifyPadletAdmin_(data.adminPassword)) {
-    return { success: false, message: '관리자 비밀번호가 일치하지 않습니다.' };
-  }
+  var isAdmin = verifyPadletAdmin_(data.adminPassword);
+  var studentId = String(data.studentId || '').trim();
+  var studentName = String(data.studentName || '').trim();
 
   var sheet = getPadletSheet_();
   var rowNum = findPadletRow_(sheet, data.postId);
   if (rowNum === -1) return { success: false, message: '게시물을 찾을 수 없습니다.' };
+
+  if (!isAdmin) {
+    if (!verifyPadletStudent_(studentId, studentName)) {
+      return { success: false, message: '학번 또는 이름이 명단과 일치하지 않습니다.' };
+    }
+    var ownerRow = sheet.getRange(rowNum, 3, 1, 2).getValues()[0];
+    if (padletAuthorKey_(ownerRow[0], ownerRow[1]) !== padletAuthorKey_(studentId, studentName)) {
+      return { success: false, message: '본인이 작성한 게시물만 삭제할 수 있습니다.' };
+    }
+  }
 
   sheet.deleteRow(rowNum);
   return { success: true };
