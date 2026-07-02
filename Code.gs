@@ -287,6 +287,12 @@ function getPadletPosts(myId, myName) {
     var row = data[i];
     if (!row[0]) continue;
     var reactions = padletSafeJson_(row[9], {});
+    // 반응기록 JSON의 키는 "학번||이름" 형태(padletAuthorKey_) — 이름만 뽑아서
+    // "누가 좋아요를 눌렀는지" 마우스오버로 보여줄 때 씀
+    var likerNames = Object.keys(reactions).map(function (k) {
+      var parts = k.split('||');
+      return parts[1] || parts[0];
+    });
     var comments = padletSafeJson_(row[10], []).map(function (c) {
       c.isTeacher = padletIsTeacher_(c.studentId);
       c.isMine = padletAuthorKey_(c.studentId, c.studentName) === myKey;
@@ -302,6 +308,7 @@ function getPadletPosts(myId, myName) {
       title: row[6],
       content: row[7],
       likeCount: Number(row[8]) || 0,
+      likerNames: likerNames,
       myLiked: !!reactions[myKey],
       comments: comments,
       isTeacher: padletIsTeacher_(row[2]),
