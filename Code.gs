@@ -198,6 +198,30 @@ var PADLET_BOARDS = ['idea', 'complaint', 'ask', 'disclosure', 'tips', 'link'];
 var PADLET_TEACHER_ID = '0000';
 var PADLET_ADMIN_PASSWORD = '7683101'; // 관리자 모드 비밀번호 (게시물 고정/전체 수정·삭제 권한)
 
+// 1회성 수복 함수 — Apps Script 편집기에서 딱 한 번 직접 실행하면 됨.
+// 교사 게시물의 학번('0000')이 구글시트에 저장될 때 숫자로 자동 변환되면서
+// 앞의 0이 사라져 0으로 저장된 기존 행들을 다시 '0000' 문자로 되돌린다.
+// (이 문제 때문에 교사 게시물 상단고정, 수정, 삭제가 "본인 글이 아닙니다"로 실패할 수 있음)
+function fixPadletTeacherIds() {
+  var sheet = getPadletSheet_();
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 2) return '수정할 행이 없습니다.';
+
+  // 앞으로도 다시 숫자로 변환되지 않도록 학번 열 전체를 텍스트 서식으로 고정
+  sheet.getRange(2, 3, lastRow - 1, 1).setNumberFormat('@');
+
+  var ids = sheet.getRange(2, 3, lastRow - 1, 1).getValues();
+  var fixed = 0;
+  for (var i = 0; i < ids.length; i++) {
+    if (String(ids[i][0]) === '0') {
+      sheet.getRange(i + 2, 3).setValue('0000');
+      fixed++;
+    }
+  }
+  Logger.log('학번 0 -> 0000 으로 복구된 행: ' + fixed + '개');
+  return fixed;
+}
+
 function getPadletSheet_() {
   var ss = SpreadsheetApp.openById(SHEET_ID);
   var sheet = ss.getSheetByName(PADLET_SHEET_NAME);
@@ -352,6 +376,10 @@ function submitPadletPost(data) {
 
   var sheet = getPadletSheet_();
   var id = 'P' + new Date().getTime() + Math.floor(Math.random() * 1000);
+  // 학번(특히 교사용 '0000')이 숫자로 자동 변환되어 앞의 0이 사라지는 걸 막기 위해,
+  // appendRow로 값이 들어갈 다음 행의 C열(학번)을 미리 텍스트 서식으로 고정해둔다.
+  var nextRow = sheet.getLastRow() + 1;
+  sheet.getRange(nextRow, 3).setNumberFormat('@');
   sheet.appendRow([
     id, new Date(), studentId, studentName, data.board, authorType,
     (data.title || '').trim(), data.content.trim(), 0, '{}', '[]', false
