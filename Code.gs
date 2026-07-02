@@ -26,6 +26,12 @@ function doGet(e) {
       .setMimeType(ContentService.MimeType.JSON);
   }
 
+  if (action === 'verifyPadletAdmin') {
+    return ContentService
+      .createTextOutput(JSON.stringify({ valid: verifyPadletAdmin_(e.parameter.password) }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+
   if (page === 'gallery') {
     return HtmlService.createHtmlOutputFromFile('Gallery')
         .setTitle('학생 작품 갤러리')
@@ -59,6 +65,10 @@ function doPost(e) {
       result = addPadletComment(data);
     } else if (action === 'deletePadletComment') {
       result = deletePadletComment(data);
+    } else if (action === 'togglePadletPin') {
+      result = togglePadletPin(data);
+    } else if (action === 'deletePadletPost') {
+      result = deletePadletPost(data);
     } else {
       result = { success: false, message: '알 수 없는 action: ' + action };
     }
@@ -186,13 +196,14 @@ function saveFile(fileBlob) {
 var PADLET_SHEET_NAME = '디지털시민성패들렛';
 var PADLET_BOARDS = ['idea', 'complaint', 'ask', 'disclosure', 'tips'];
 var PADLET_TEACHER_ID = '0000';
+var PADLET_ADMIN_PASSWORD = '7683101'; // 관리자 모드 비밀번호 (게시물 고정/전체 수정·삭제 권한)
 
 function getPadletSheet_() {
   var ss = SpreadsheetApp.openById(SHEET_ID);
   var sheet = ss.getSheetByName(PADLET_SHEET_NAME);
   if (!sheet) {
     sheet = ss.insertSheet(PADLET_SHEET_NAME);
-    sheet.appendRow(['게시ID', '제출시각', '작성자ID', '작성자이름', '파트', '작성자유형', '제목', '내용', '좋아요수', '반응기록JSON', '댓글JSON']);
+    sheet.appendRow(['게시ID', '제출시각', '작성자ID', '작성자이름', '파트', '작성자유형', '제목', '내용', '좋아요수', '반응기록JSON', '댓글JSON', '고정여부']);
   }
   return sheet;
 }
@@ -218,6 +229,11 @@ function padletIsTeacher_(id) {
 
 function padletNormalize_(s) {
   return String(s || '').replace(/\s+/g, '');
+}
+
+// 관리자 모드 비밀번호 확인 (게시물 고정, 전체 수정/삭제 권한에 사용)
+function verifyPadletAdmin_(password) {
+  return String(password || '') === PADLET_ADMIN_PASSWORD;
 }
 
 // 명단 탭을 이름이 아니라 gid(탭 고유ID)로 찾음 — 탭 이름이 바뀌어도 안전하게 동작
@@ -289,11 +305,13 @@ function getPadletPosts(myId, myName) {
       myLiked: !!reactions[myKey],
       comments: comments,
       isTeacher: padletIsTeacher_(row[2]),
-      isMine: padletAuthorKey_(row[2], row[3]) === myKey
+      isMine: padletAuthorKey_(row[2], row[3]) === myKey,
+      pinned: row[11] === true || String(row[11]).toUpperCase() === 'TRUE'
     });
   }
   posts.sort(function (a, b) {
-    if (a.isTeacher !== b.isTeacher) return a.isTeacher ? -1 : 1; // 교사 게시물 상단 고정
+    if (a.pinned !== b.pinned) return a.pinned ? -1 : 1; // 관리자가 고정한 게시물이 항상 최상단
+    if (a.isTeacher !== b.isTeacher) return a.isTeacher ? -1 : 1; // 그 다음 교사 게시물
     return a.id < b.id ? 1 : -1; // 그 외엔 최신 게시물이 위로
   });
   return { valid: true, posts: posts };
@@ -329,16 +347,17 @@ function submitPadletPost(data) {
   var id = 'P' + new Date().getTime() + Math.floor(Math.random() * 1000);
   sheet.appendRow([
     id, new Date(), studentId, studentName, data.board, authorType,
-    (data.title || '').trim(), data.content.trim(), 0, '{}', '[]'
+    (data.title || '').trim(), data.content.trim(), 0, '{}', '[]', false
   ]);
   return { success: true, id: id };
 }
 
-// 게시물 수정 — 본인(학번+이름 조합)이 작성한 게시물만 가능
+// 게시물 수정 — 본인(학번+이름 조합)이 작성한 게시물만 가능 (단, 관리자 비밀번호가 맞으면 누구 글이든 수정 가능)
 function editPadletPost(data) {
   var studentId = String(data.studentId || '').trim();
   var studentName = String(data.studentName || '').trim();
-  if (!verifyPadletStudent_(studentId, studentName)) {
+  var isAdmin = verifyPadletAdmin_(data.adminPassword);
+  if (!isAdmin && !verifyPadletStudent_(studentId, studentName)) {
     return { success: false, message: '학번 또는 이름이 명단과 일치하지 않습니다.' };
   }
   if (!data.content || data.content.trim().length < 3) {
@@ -349,9 +368,11 @@ function editPadletPost(data) {
   var rowNum = findPadletRow_(sheet, data.postId);
   if (rowNum === -1) return { success: false, message: '게시물을 찾을 수 없습니다.' };
 
-  var ownerRow = sheet.getRange(rowNum, 3, 1, 2).getValues()[0];
-  if (padletAuthorKey_(ownerRow[0], ownerRow[1]) !== padletAuthorKey_(studentId, studentName)) {
-    return { success: false, message: '본인이 작성한 게시물만 수정할 수 있습니다.' };
+  if (!isAdmin) {
+    var ownerRow = sheet.getRange(rowNum, 3, 1, 2).getValues()[0];
+    if (padletAuthorKey_(ownerRow[0], ownerRow[1]) !== padletAuthorKey_(studentId, studentName)) {
+      return { success: false, message: '본인이 작성한 게시물만 수정할 수 있습니다.' };
+    }
   }
 
   var board = sheet.getRange(rowNum, 5).getValue();
@@ -432,10 +453,12 @@ function addPadletComment(data) {
 }
 
 // 본인(학번+이름 조합) 댓글/대댓글 삭제 — 대댓글이 달린 댓글을 지우면 대댓글도 함께 삭제
+// (관리자 비밀번호가 맞으면 누구 댓글이든 삭제 가능)
 function deletePadletComment(data) {
   var studentId = String(data.studentId || '').trim();
   var studentName = String(data.studentName || '').trim();
-  if (!verifyPadletStudent_(studentId, studentName)) {
+  var isAdmin = verifyPadletAdmin_(data.adminPassword);
+  if (!isAdmin && !verifyPadletStudent_(studentId, studentName)) {
     return { success: false, message: '학번 또는 이름이 명단과 일치하지 않습니다.' };
   }
   var myKey = padletAuthorKey_(studentId, studentName);
@@ -450,7 +473,7 @@ function deletePadletComment(data) {
     if (comments[i].id === data.commentId) { target = comments[i]; break; }
   }
   if (!target) return { success: false, message: '댓글을 찾을 수 없습니다.' };
-  if (padletAuthorKey_(target.studentId, target.studentName) !== myKey) {
+  if (!isAdmin && padletAuthorKey_(target.studentId, target.studentName) !== myKey) {
     return { success: false, message: '본인이 작성한 댓글만 삭제할 수 있습니다.' };
   }
 
@@ -469,4 +492,34 @@ function deletePadletComment(data) {
     };
   });
   return { success: true, comments: result };
+}
+
+// 관리자 전용: 게시물 상단 고정/해제 토글
+function togglePadletPin(data) {
+  if (!verifyPadletAdmin_(data.adminPassword)) {
+    return { success: false, message: '관리자 비밀번호가 일치하지 않습니다.' };
+  }
+
+  var sheet = getPadletSheet_();
+  var rowNum = findPadletRow_(sheet, data.postId);
+  if (rowNum === -1) return { success: false, message: '게시물을 찾을 수 없습니다.' };
+
+  var current = sheet.getRange(rowNum, 12).getValue();
+  var pinned = !(current === true || String(current).toUpperCase() === 'TRUE');
+  sheet.getRange(rowNum, 12).setValue(pinned);
+  return { success: true, pinned: pinned };
+}
+
+// 관리자 전용: 게시물 전체 삭제 (댓글 포함, 행 자체를 지움)
+function deletePadletPost(data) {
+  if (!verifyPadletAdmin_(data.adminPassword)) {
+    return { success: false, message: '관리자 비밀번호가 일치하지 않습니다.' };
+  }
+
+  var sheet = getPadletSheet_();
+  var rowNum = findPadletRow_(sheet, data.postId);
+  if (rowNum === -1) return { success: false, message: '게시물을 찾을 수 없습니다.' };
+
+  sheet.deleteRow(rowNum);
+  return { success: true };
 }
