@@ -12,6 +12,12 @@ function doGet(e) {
       .setMimeType(ContentService.MimeType.JSON);
   }
 
+  if (action === 'getPadletPosts') {
+    return ContentService
+      .createTextOutput(JSON.stringify(getPadletPosts(e.parameter.studentId, e.parameter.studentName)))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+
   if (page === 'gallery') {
     return HtmlService.createHtmlOutputFromFile('Gallery')
         .setTitle('학생 작품 갤러리')
@@ -35,6 +41,16 @@ function doPost(e) {
     } else if (action === 'addLike') {
       var updatedLikes = addLike(data.rowIndex, data.likerName);
       result = { success: true, likes: updatedLikes };
+    } else if (action === 'submitPadletPost') {
+      result = submitPadletPost(data);
+    } else if (action === 'editPadletPost') {
+      result = editPadletPost(data);
+    } else if (action === 'togglePadletReaction') {
+      result = togglePadletReaction(data);
+    } else if (action === 'addPadletComment') {
+      result = addPadletComment(data);
+    } else if (action === 'deletePadletComment') {
+      result = deletePadletComment(data);
     } else {
       result = { success: false, message: '알 수 없는 action: ' + action };
     }
@@ -155,4 +171,251 @@ function saveFile(fileBlob) {
   var file    = folder.createFile(fileBlob);
   file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
   return file.getUrl();
+}
+
+// ===================== padlet.html (디지털 시민성 바이브코딩 아이디어 패들렛) =====================
+// 학번/이름은 별도 명단으로 검증하지 않고 그대로 받아 기록한다(전교 대상, 교사는 학번란에 0000 입력).
+var PADLET_SHEET_NAME = '디지털시민성패들렛';
+var PADLET_BOARDS = ['idea', 'complaint', 'ask'];
+var PADLET_TEACHER_ID = '0000';
+
+function getPadletSheet_() {
+  var ss = SpreadsheetApp.openById(SHEET_ID);
+  var sheet = ss.getSheetByName(PADLET_SHEET_NAME);
+  if (!sheet) {
+    sheet = ss.insertSheet(PADLET_SHEET_NAME);
+    sheet.appendRow(['게시ID', '제출시각', '작성자ID', '작성자이름', '파트', '작성자유형', '제목', '내용', '좋아요수', '반응기록JSON', '댓글JSON']);
+  }
+  return sheet;
+}
+
+function padletSafeJson_(str, fallback) {
+  try {
+    if (!str) return fallback;
+    return JSON.parse(str);
+  } catch (e) {
+    return fallback;
+  }
+}
+
+// 학번+이름 조합을 식별키로 사용 — 교사는 전부 학번이 '0000'으로 같으므로,
+// 이름까지 합쳐야 교사 여러 명이 서로의 좋아요/댓글 삭제 권한을 침범하지 않는다.
+function padletAuthorKey_(id, name) {
+  return String(id || '').trim() + '||' + String(name || '').trim();
+}
+
+function padletIsTeacher_(id) {
+  return String(id || '').trim() === PADLET_TEACHER_ID;
+}
+
+// 게시ID로 행 번호를 찾을 때 ID열(A열)만 읽음 — 댓글이 쌓여 행이 커져도 조회 속도가 느려지지 않게 함
+function findPadletRow_(sheet, postId) {
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 2) return -1;
+  var ids = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
+  for (var i = 0; i < ids.length; i++) {
+    if (String(ids[i][0]) === String(postId)) return i + 2; // 1-based, 헤더행(1) 보정
+  }
+  return -1;
+}
+
+// 클라이언트(padlet.html)에서 호출: 전체 게시물 + 내 반응/소유 상태 포함해 반환
+function getPadletPosts(myId, myName) {
+  var sheet = getPadletSheet_();
+  var data = sheet.getDataRange().getValues();
+  var myKey = padletAuthorKey_(myId, myName);
+  var posts = [];
+  for (var i = 1; i < data.length; i++) {
+    var row = data[i];
+    if (!row[0]) continue;
+    var reactions = padletSafeJson_(row[9], {});
+    var comments = padletSafeJson_(row[10], []).map(function (c) {
+      c.isTeacher = padletIsTeacher_(c.studentId);
+      c.isMine = padletAuthorKey_(c.studentId, c.studentName) === myKey;
+      return c;
+    });
+    posts.push({
+      id: row[0],
+      timestamp: Utilities.formatDate(new Date(row[1]), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm'),
+      authorId: row[2],
+      authorName: row[3],
+      board: row[4],
+      authorType: row[5],
+      title: row[6],
+      content: row[7],
+      likeCount: Number(row[8]) || 0,
+      myLiked: !!reactions[myKey],
+      comments: comments,
+      isTeacher: padletIsTeacher_(row[2]),
+      isMine: padletAuthorKey_(row[2], row[3]) === myKey
+    });
+  }
+  posts.sort(function (a, b) {
+    if (a.isTeacher !== b.isTeacher) return a.isTeacher ? -1 : 1; // 교사 게시물 상단 고정
+    return a.id < b.id ? 1 : -1; // 그 외엔 최신 게시물이 위로
+  });
+  return { valid: true, posts: posts };
+}
+
+// 게시물 등록
+function submitPadletPost(data) {
+  var studentId = String(data.studentId || '').trim();
+  var studentName = String(data.studentName || '').trim();
+  if (!studentId || !studentName) {
+    return { success: false, message: '학번(또는 0000)과 이름을 입력해주세요.' };
+  }
+  if (PADLET_BOARDS.indexOf(data.board) === -1) {
+    return { success: false, message: '파트를 올바르게 선택해주세요.' };
+  }
+  if (!data.content || data.content.trim().length < 3) {
+    return { success: false, message: '내용을 3자 이상 작성해주세요.' };
+  }
+
+  var isTeacher = padletIsTeacher_(studentId);
+  var authorType = isTeacher ? '교사' : '학생';
+  if (data.board === 'complaint') {
+    if (['학생', '학부모', '교사'].indexOf(data.authorType) === -1) {
+      return { success: false, message: '작성자 유형(학생/학부모/교사)을 선택해주세요.' };
+    }
+    authorType = data.authorType;
+  }
+
+  var sheet = getPadletSheet_();
+  var id = 'P' + new Date().getTime() + Math.floor(Math.random() * 1000);
+  sheet.appendRow([
+    id, new Date(), studentId, studentName, data.board, authorType,
+    (data.title || '').trim(), data.content.trim(), 0, '{}', '[]'
+  ]);
+  return { success: true, id: id };
+}
+
+// 게시물 수정 — 본인(학번+이름 조합)이 작성한 게시물만 가능
+function editPadletPost(data) {
+  var studentId = String(data.studentId || '').trim();
+  var studentName = String(data.studentName || '').trim();
+  if (!data.content || data.content.trim().length < 3) {
+    return { success: false, message: '내용을 3자 이상 작성해주세요.' };
+  }
+
+  var sheet = getPadletSheet_();
+  var rowNum = findPadletRow_(sheet, data.postId);
+  if (rowNum === -1) return { success: false, message: '게시물을 찾을 수 없습니다.' };
+
+  var ownerRow = sheet.getRange(rowNum, 3, 1, 2).getValues()[0];
+  if (padletAuthorKey_(ownerRow[0], ownerRow[1]) !== padletAuthorKey_(studentId, studentName)) {
+    return { success: false, message: '본인이 작성한 게시물만 수정할 수 있습니다.' };
+  }
+
+  var board = sheet.getRange(rowNum, 5).getValue();
+  if (board === 'complaint' && ['학생', '학부모', '교사'].indexOf(data.authorType) !== -1) {
+    sheet.getRange(rowNum, 6).setValue(data.authorType);
+  }
+  sheet.getRange(rowNum, 7, 1, 2).setValues([[(data.title || '').trim(), data.content.trim()]]);
+  return { success: true };
+}
+
+// 좋아요 토글 — 학번+이름 조합 1개당 게시물 1개에 좋아요 1개만 가능, 다시 누르면 취소
+function togglePadletReaction(data) {
+  var studentId = String(data.studentId || '').trim();
+  var studentName = String(data.studentName || '').trim();
+  if (!studentId || !studentName) {
+    return { success: false, message: '로그인 정보가 없습니다.' };
+  }
+
+  var sheet = getPadletSheet_();
+  var rowNum = findPadletRow_(sheet, data.postId);
+  if (rowNum === -1) return { success: false, message: '게시물을 찾을 수 없습니다.' };
+
+  var row = sheet.getRange(rowNum, 9, 1, 2).getValues()[0];
+  var likeCount = Number(row[0]) || 0;
+  var reactions = padletSafeJson_(row[1], {});
+  var key = padletAuthorKey_(studentId, studentName);
+
+  var liked = !!reactions[key];
+  if (liked) {
+    delete reactions[key];
+    likeCount--;
+  } else {
+    reactions[key] = true;
+    likeCount++;
+  }
+  likeCount = Math.max(0, likeCount);
+
+  sheet.getRange(rowNum, 9, 1, 2).setValues([[likeCount, JSON.stringify(reactions)]]);
+  return { success: true, likeCount: likeCount, myLiked: !liked };
+}
+
+// 댓글/대댓글 추가
+function addPadletComment(data) {
+  var studentId = String(data.studentId || '').trim();
+  var studentName = String(data.studentName || '').trim();
+  if (!studentId || !studentName) {
+    return { success: false, message: '로그인 정보가 없습니다.' };
+  }
+  if (!data.text || data.text.trim().length < 1) {
+    return { success: false, message: '댓글 내용을 입력해주세요.' };
+  }
+
+  var sheet = getPadletSheet_();
+  var rowNum = findPadletRow_(sheet, data.postId);
+  if (rowNum === -1) return { success: false, message: '게시물을 찾을 수 없습니다.' };
+
+  var comments = padletSafeJson_(sheet.getRange(rowNum, 11).getValue(), []);
+  var comment = {
+    id: 'C' + new Date().getTime() + Math.floor(Math.random() * 1000),
+    parentId: data.parentId || null,
+    studentId: studentId,
+    studentName: studentName,
+    text: data.text.trim(),
+    time: Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm')
+  };
+  comments.push(comment);
+  sheet.getRange(rowNum, 11).setValue(JSON.stringify(comments));
+
+  var result = comments.map(function (c) {
+    return {
+      id: c.id, parentId: c.parentId, studentId: c.studentId, studentName: c.studentName,
+      text: c.text, time: c.time,
+      isTeacher: padletIsTeacher_(c.studentId),
+      isMine: padletAuthorKey_(c.studentId, c.studentName) === padletAuthorKey_(studentId, studentName)
+    };
+  });
+  return { success: true, comments: result };
+}
+
+// 본인(학번+이름 조합) 댓글/대댓글 삭제 — 대댓글이 달린 댓글을 지우면 대댓글도 함께 삭제
+function deletePadletComment(data) {
+  var studentId = String(data.studentId || '').trim();
+  var studentName = String(data.studentName || '').trim();
+  var myKey = padletAuthorKey_(studentId, studentName);
+
+  var sheet = getPadletSheet_();
+  var rowNum = findPadletRow_(sheet, data.postId);
+  if (rowNum === -1) return { success: false, message: '게시물을 찾을 수 없습니다.' };
+
+  var comments = padletSafeJson_(sheet.getRange(rowNum, 11).getValue(), []);
+  var target = null;
+  for (var i = 0; i < comments.length; i++) {
+    if (comments[i].id === data.commentId) { target = comments[i]; break; }
+  }
+  if (!target) return { success: false, message: '댓글을 찾을 수 없습니다.' };
+  if (padletAuthorKey_(target.studentId, target.studentName) !== myKey) {
+    return { success: false, message: '본인이 작성한 댓글만 삭제할 수 있습니다.' };
+  }
+
+  comments = comments.filter(function (c) {
+    return c.id !== data.commentId && c.parentId !== data.commentId;
+  });
+
+  sheet.getRange(rowNum, 11).setValue(JSON.stringify(comments));
+
+  var result = comments.map(function (c) {
+    return {
+      id: c.id, parentId: c.parentId, studentId: c.studentId, studentName: c.studentName,
+      text: c.text, time: c.time,
+      isTeacher: padletIsTeacher_(c.studentId),
+      isMine: padletAuthorKey_(c.studentId, c.studentName) === myKey
+    };
+  });
+  return { success: true, comments: result };
 }
