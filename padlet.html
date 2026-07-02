@@ -55,6 +55,13 @@
   #whoami b { color: var(--text); }
   #teacherTag { font-size: 10.5px; font-weight: bold; color: #c0276b; background: #ffd5e8; border-radius: 999px; padding: 2px 7px; margin-left: 4px; }
   #logoutBtn { margin-left: 10px; font-size: 12px; color: var(--accent); cursor: pointer; text-decoration: underline; }
+  #adminBtn {
+    font-size: 12px; font-weight: bold; color: #555; background: #eef0f5; border: 1px solid var(--line);
+    border-radius: 999px; padding: 6px 12px; cursor: pointer; margin-left: 10px; white-space: nowrap;
+  }
+  #adminBtn:hover { background: #e2e6f0; }
+  #adminBtn.on { background: #2c2f3a; color: #fff; border-color: #2c2f3a; }
+  .pin-badge { font-size: 10.5px; font-weight: bold; color: #a8590a; background: #ffe3b8; border-radius: 999px; padding: 2px 7px; margin-left: 5px; }
 
   /* ===== 보드(3열) ===== */
   #board { flex: 1; display: flex; gap: 14px; padding: 16px; overflow-x: auto; align-items: flex-start; }
@@ -145,6 +152,16 @@
   #modalSubmitBtn { background: var(--accent); color: #fff; font-weight: bold; }
   #modalMsg { font-size: 12.5px; color: #c0392b; margin-top: 8px; min-height: 16px; }
 
+  /* ===== 관리자 모드 비밀번호 모달 ===== */
+  #adminModalOverlay { position: fixed; inset: 0; background: rgba(15,20,40,.45); display: none; align-items: center; justify-content: center; z-index: 110; padding: 16px; }
+  #adminModalOverlay.show { display: flex; }
+  #adminModalBox { background: #fff; border-radius: 14px; padding: 24px; width: 100%; max-width: 340px; box-shadow: 0 10px 40px rgba(0,0,0,.25); text-align: center; }
+  #adminModalBox h2 { font-size: 16px; margin: 0 0 12px; }
+  #adminModalBox input { width: 100%; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; font-size: 14px; text-align: center; }
+  #adminModalBox .modal-btn-row { display: flex; gap: 8px; margin-top: 14px; }
+  #adminModalBox .modal-btn-row button { flex: 1; padding: 10px; border-radius: 8px; font-size: 14px; cursor: pointer; border: none; }
+  #adminModalMsg { font-size: 12.5px; color: #c0392b; margin-top: 8px; min-height: 16px; }
+
   .hidden { display: none !important; }
 
   /* ===== 로딩 오버레이 ===== */
@@ -191,9 +208,25 @@
       <h1>🗂️ 디지털 시민성 바이브코딩 아이디어 패들렛
         <span>전교생·학부모·선생님 누구나 참여할 수 있는 학교 전체 게시판입니다.</span>
       </h1>
-      <div id="whoami"></div>
+      <div id="headerRight" style="display:flex;align-items:center;">
+        <div id="whoami"></div>
+        <button id="adminBtn" onclick="onAdminBtnClick()">🔐 관리자모드</button>
+      </div>
     </header>
     <div id="board"></div>
+  </div>
+
+  <!-- ===== 관리자 모드 비밀번호 모달 ===== -->
+  <div id="adminModalOverlay">
+    <div id="adminModalBox">
+      <h2>🔐 관리자 모드</h2>
+      <input type="password" id="adminPasswordInput" placeholder="비밀번호" onkeydown="if(event.key==='Enter')submitAdminPassword()">
+      <div id="adminModalMsg"></div>
+      <div class="modal-btn-row">
+        <button id="adminModalCancelBtn" onclick="closeAdminModal()" style="background:#eef0f5;color:#555;">취소</button>
+        <button id="adminModalSubmitBtn" onclick="submitAdminPassword()" style="background:var(--accent);color:#fff;font-weight:bold;">확인</button>
+      </div>
+    </div>
   </div>
 
   <!-- ===== 글쓰기 모달 ===== -->
@@ -242,6 +275,8 @@ var BOARDS = [
 var studentId = '';
 var studentName = '';
 var isTeacher = false;
+var isAdmin = false;
+var adminPassword = '';
 var currentPosts = [];
 var expandedComments = {};
 var expandedReplyFor = {};
@@ -317,6 +352,53 @@ function logout() {
   location.reload();
 }
 
+// ===================== 관리자 모드 =====================
+// 새로고침하면 다시 비밀번호를 입력해야 하도록 일부러 localStorage에 저장하지 않는다.
+function onAdminBtnClick() {
+  if (isAdmin) {
+    if (confirm('관리자 모드를 종료할까요?')) {
+      isAdmin = false;
+      adminPassword = '';
+      updateAdminBtn();
+      renderBoard(currentPosts);
+    }
+    return;
+  }
+  document.getElementById('adminPasswordInput').value = '';
+  document.getElementById('adminModalMsg').textContent = '';
+  document.getElementById('adminModalOverlay').classList.add('show');
+  document.getElementById('adminPasswordInput').focus();
+}
+
+function closeAdminModal() {
+  document.getElementById('adminModalOverlay').classList.remove('show');
+}
+
+function submitAdminPassword() {
+  var pw = document.getElementById('adminPasswordInput').value;
+  var msg = document.getElementById('adminModalMsg');
+  msg.textContent = '확인 중...';
+  apiGet({ action: 'verifyPadletAdmin', password: pw }, true).then(function (res) {
+    if (!res.valid) { msg.textContent = '비밀번호가 일치하지 않습니다.'; return; }
+    isAdmin = true;
+    adminPassword = pw;
+    closeAdminModal();
+    updateAdminBtn();
+    renderBoard(currentPosts);
+  }).catch(function () { msg.textContent = '서버 연결에 실패했습니다.'; });
+}
+
+function updateAdminBtn() {
+  var btn = document.getElementById('adminBtn');
+  if (isAdmin) {
+    btn.textContent = '🔓 관리자 모드 종료';
+    btn.classList.add('on');
+  } else {
+    btn.textContent = '🔐 관리자모드';
+    btn.classList.remove('on');
+  }
+}
+
 (function tryAutoLogin() {
   try {
     var saved = JSON.parse(localStorage.getItem('dgs_padlet_login') || 'null');
@@ -373,7 +455,7 @@ function commentBoardClass(post, c) {
 
 function renderCommentActions(post, c) {
   var actions = '<span class="comment-action" onclick="toggleReplyBox(\'' + c.id + '\')">답글</span>';
-  if (c.isMine) {
+  if (c.isMine || isAdmin) {
     actions += ' <span class="comment-action danger" onclick="deleteComment(\'' + post.id + '\',\'' + c.id + '\')">삭제</span>';
   }
   return actions;
@@ -421,13 +503,18 @@ function renderPostCard(post) {
     '</div>';
   }
 
-  var editLink = post.isMine
+  var editLink = (post.isMine || isAdmin)
     ? ' <span class="comment-action" onclick="openEditModal(\'' + post.id + '\')">✏️ 수정</span>'
     : '';
-  var titleHtml = post.title ? '<div class="post-title">' + escapeHtml(post.title) + '</div>' : '';
+  var adminLinks = isAdmin
+    ? ' <span class="comment-action" onclick="togglePin(\'' + post.id + '\')">' + (post.pinned ? '📌 고정 해제' : '📌 상단 고정') + '</span>' +
+      ' <span class="comment-action danger" onclick="deletePost(\'' + post.id + '\')">🗑 삭제</span>'
+    : '';
+  var pinBadge = post.pinned ? ' <span class="pin-badge">📌 고정</span>' : '';
+  var titleHtml = post.title ? '<div class="post-title">' + escapeHtml(post.title) + pinBadge + '</div>' : (post.pinned ? '<div class="post-title">' + pinBadge + '</div>' : '');
 
   return '<div class="post-card ' + cardBoardClass(post) + '">' +
-    '<div class="post-meta"><b>' + escapeHtml(post.authorName) + '</b>' + idTag(post.authorId, post.isTeacher) + typeBadge(post.authorType) + ' · ' + escapeHtml(post.timestamp) + editLink + '</div>' +
+    '<div class="post-meta"><b>' + escapeHtml(post.authorName) + '</b>' + idTag(post.authorId, post.isTeacher) + typeBadge(post.authorType) + ' · ' + escapeHtml(post.timestamp) + editLink + adminLinks + '</div>' +
     titleHtml +
     '<div class="post-text">' + escapeHtml(post.content) + '</div>' +
     '<div class="reaction-row">' +
@@ -529,6 +616,7 @@ function submitPost() {
   };
   if (pendingBoard === 'complaint') data.authorType = getSelectedAuthorType();
   if (isEdit) data.postId = editingPostId;
+  if (isAdmin) data.adminPassword = adminPassword;
 
   msg.textContent = isEdit ? '수정 중...' : '게시 중...';
   apiPost(data).then(function (res) {
@@ -590,11 +678,29 @@ function submitReply(postId, parentId) {
 
 function deleteComment(postId, commentId) {
   if (!confirm('이 댓글을 삭제할까요? (답글이 있다면 함께 삭제됩니다)')) return;
-  apiPost({ action: 'deletePadletComment', studentId: studentId, studentName: studentName, postId: postId, commentId: commentId }).then(function (res) {
+  var data = { action: 'deletePadletComment', studentId: studentId, studentName: studentName, postId: postId, commentId: commentId };
+  if (isAdmin) data.adminPassword = adminPassword;
+  apiPost(data).then(function (res) {
     if (!res.success) { alert(res.message || '댓글 삭제에 실패했습니다.'); return; }
     currentPosts.forEach(function (p) { if (p.id === postId) p.comments = res.comments; });
     renderBoard(currentPosts);
     lastPostsJson = JSON.stringify(currentPosts);
+  }).catch(function () { alert('서버 연결에 실패했습니다.'); });
+}
+
+// ===================== 관리자 전용: 고정/삭제 =====================
+function togglePin(postId) {
+  apiPost({ action: 'togglePadletPin', postId: postId, adminPassword: adminPassword }, true).then(function (res) {
+    if (!res.success) { alert(res.message || '고정 처리에 실패했습니다.'); return; }
+    loadPosts(true);
+  }).catch(function () { alert('서버 연결에 실패했습니다.'); });
+}
+
+function deletePost(postId) {
+  if (!confirm('이 게시물을 완전히 삭제할까요? (댓글도 모두 함께 삭제되며 되돌릴 수 없습니다)')) return;
+  apiPost({ action: 'deletePadletPost', postId: postId, adminPassword: adminPassword }).then(function (res) {
+    if (!res.success) { alert(res.message || '삭제에 실패했습니다.'); return; }
+    loadPosts(true);
   }).catch(function () { alert('서버 연결에 실패했습니다.'); });
 }
 </script>
