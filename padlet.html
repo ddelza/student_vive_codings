@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>광수중학교 디지털 시민성 바이브코딩 아이디어 패들렛</title>
+<style>
+  :root {
+    --bg: #f4f6fb;
+    --card: #ffffff;
+    --line: #e2e6f0;
+    --accent: #2d6cdf;
+    --idea: #7c3aed;
+    --complaint: #d9822b;
+    --ask: #1f8a4c;
+    --text: #1c2238;
+    --sub: #6b7384;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--text); font-family: 'Segoe UI', 'Malgun Gothic', sans-serif; }
+  #app { min-height: 100vh; display: flex; flex-direction: column; }
+
+  /* ===== 로그인 화면 ===== */
+  #loginScreen { flex: 1; display: flex; align-items: center; justify-content: center; padding: 24px; }
+  #loginBox {
+    background: var(--card); border: 1px solid var(--line); border-radius: 14px;
+    padding: 32px 28px; width: 100%; max-width: 380px; box-shadow: 0 6px 24px rgba(20,30,60,.08);
+    text-align: center;
+  }
+  #loginBox h1 { font-size: 19px; margin: 0 0 6px; }
+  #loginBox p { font-size: 13px; color: var(--sub); margin: 0 0 20px; line-height: 1.5; }
+  #loginBox input {
+    width: 100%; padding: 11px 12px; margin-bottom: 10px; border: 1px solid var(--line);
+    border-radius: 8px; font-size: 14px;
+  }
+  #loginBox button {
+    width: 100%; padding: 11px; margin-top: 8px; background: var(--accent); color: #fff;
+    border: none; border-radius: 8px; font-size: 15px; font-weight: bold; cursor: pointer;
+  }
+  #loginBox button:hover { background: #1f56b8; }
+  #loginMsg { font-size: 13px; color: #c0392b; margin-top: 10px; min-height: 18px; }
+  .login-hint { font-size: 11.5px; color: #9aa1b0; margin-top: 14px; line-height: 1.6; text-align: left; background: #f5f8ff; border-radius: 8px; padding: 10px 12px; }
+
+  /* ===== 헤더 ===== */
+  header {
+    display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;
+    padding: 12px 20px; background: var(--card); border-bottom: 1px solid var(--line);
+    position: sticky; top: 0; z-index: 20;
+  }
+  header h1 { font-size: 16.5px; margin: 0; }
+  header h1 span { display: block; font-size: 12px; color: var(--sub); font-weight: normal; margin-top: 2px; }
+  #whoami { font-size: 13px; color: var(--sub); text-align: right; }
+  #whoami b { color: var(--text); }
+  #teacherTag { font-size: 10.5px; font-weight: bold; color: #c0276b; background: #ffd5e8; border-radius: 999px; padding: 2px 7px; margin-left: 4px; }
+  #logoutBtn { margin-left: 10px; font-size: 12px; color: var(--accent); cursor: pointer; text-decoration: underline; }
+
+  /* ===== 보드(3열) ===== */
+  #board { flex: 1; display: flex; gap: 14px; padding: 16px; overflow-x: auto; align-items: flex-start; }
+  .column { flex: 1; min-width: 290px; max-width: 440px; }
+  .col-header {
+    cursor: pointer; user-select: none; border-radius: 10px; padding: 12px 14px;
+    font-size: 15px; color: #fff; box-shadow: 0 2px 8px rgba(0,0,0,.08); margin-bottom: 10px; transition: filter .15s;
+  }
+  .col-header:hover { filter: brightness(1.08); }
+  .col-header.idea { background: var(--idea); }
+  .col-header.complaint { background: var(--complaint); }
+  .col-header.ask { background: var(--ask); }
+  .col-header-top { display: flex; justify-content: space-between; align-items: center; font-weight: bold; }
+  .col-count { font-size: 12px; font-weight: normal; opacity: .85; }
+  .col-desc { font-size: 11.5px; font-weight: normal; opacity: .92; margin-top: 4px; line-height: 1.4; }
+
+  .post-card {
+    background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+    padding: 13px 14px; margin-bottom: 12px; box-shadow: 0 1px 4px rgba(20,30,60,.05);
+  }
+  .post-card.board-idea { background: #ece3fb; border-color: #cdb6f0; }
+  .post-card.board-complaint { background: #ffe6cf; border-color: #f3b97a; }
+  .post-card.board-ask { background: #eaf6d6; border-color: #c9e08f; }
+  .post-card.teacher-post { background: #ffe6f0; border-color: #f5b8d2; }
+
+  .type-badge { font-size: 10.5px; font-weight: bold; border-radius: 999px; padding: 2px 7px; margin-left: 5px; white-space: nowrap; }
+  .type-badge.학생 { color: #3a4a7a; background: #e8edfb; }
+  .type-badge.학부모 { color: #0e7c6b; background: #d6f5f0; }
+  .type-badge.교사 { color: #c0276b; background: #ffd5e8; }
+
+  .comment-item.board-idea { background: #ece3fb; border-radius: 6px; padding: 4px 6px; }
+  .comment-item.board-complaint { background: #ffe6cf; border-radius: 6px; padding: 4px 6px; }
+  .comment-item.board-ask { background: #eaf6d6; border-radius: 6px; padding: 4px 6px; }
+  .comment-item.teacher-comment { background: #ffe6f0; border-radius: 6px; padding: 4px 6px; }
+
+  .post-meta { font-size: 11.5px; color: var(--sub); margin-bottom: 6px; }
+  .post-meta b { color: var(--text); }
+  .post-title { font-size: 14.5px; font-weight: bold; margin-top: 4px; }
+  .post-text { font-size: 13.5px; line-height: 1.55; margin-top: 4px; white-space: pre-wrap; word-break: break-word; }
+
+  .reaction-row { display: flex; gap: 8px; margin-top: 10px; }
+  .react-btn {
+    border: 1px solid var(--line); background: #f7f8fb; border-radius: 999px; padding: 5px 11px;
+    font-size: 12.5px; cursor: pointer; transition: .12s;
+  }
+  .react-btn:hover { background: #eef1f8; }
+  .react-btn.active { background: #ffe9e9; border-color: #f08a8a; color: #c0392b; }
+
+  .comment-toggle { font-size: 12px; color: var(--accent); cursor: pointer; margin-top: 9px; display: inline-block; }
+  .comment-box { margin-top: 8px; border-top: 1px dashed var(--line); padding-top: 8px; }
+  .comment-item { font-size: 12.5px; margin-bottom: 6px; line-height: 1.45; }
+  .comment-item b { color: var(--text); }
+  .comment-item .ctime { color: #aab1c0; font-size: 11px; margin-left: 4px; }
+  .comment-item.reply { margin-left: 18px; color: #555; }
+  .comment-action { font-size: 11px; color: var(--accent); cursor: pointer; margin-left: 4px; }
+  .comment-action.danger { color: #c0392b; }
+  .comment-input-row.reply-input { margin-left: 18px; }
+  .comment-input-row { display: flex; gap: 6px; margin-top: 6px; }
+  .comment-input-row input { flex: 1; padding: 7px 9px; border: 1px solid var(--line); border-radius: 7px; font-size: 12.5px; }
+  .comment-input-row button { padding: 7px 11px; border: none; border-radius: 7px; background: var(--accent); color: #fff; font-size: 12.5px; cursor: pointer; }
+  .empty-col { font-size: 12.5px; color: var(--sub); text-align: center; padding: 20px 6px; }
+
+  /* ===== 글쓰기 모달 ===== */
+  #modalOverlay { position: fixed; inset: 0; background: rgba(15,20,40,.45); display: none; align-items: center; justify-content: center; z-index: 100; padding: 16px; }
+  #modalOverlay.show { display: flex; }
+  #modalBox { background: #fff; border-radius: 14px; padding: 24px; width: 100%; max-width: 480px; max-height: 88vh; overflow-y: auto; box-shadow: 0 10px 40px rgba(0,0,0,.25); }
+  #modalBox h2 { font-size: 17px; margin: 0 0 4px; }
+  #modalBox .modal-sub { font-size: 12.5px; color: var(--sub); margin-bottom: 16px; line-height: 1.5; }
+  #modalBox label { font-size: 13.5px; font-weight: bold; display: block; margin: 14px 0 6px; }
+  #modalBox input[type="text"], #modalBox textarea {
+    width: 100%; padding: 10px; border: 1px solid var(--line); border-radius: 8px;
+    font-size: 13.5px; font-family: inherit; resize: vertical;
+  }
+  #modalBox textarea { min-height: 100px; }
+  .radio-row { display: flex; gap: 14px; margin-top: 4px; }
+  .radio-row label { display: flex; align-items: center; gap: 5px; font-size: 13.5px; font-weight: normal; margin: 0; }
+  .radio-row input { width: auto; margin: 0; }
+  .modal-btn-row { display: flex; gap: 8px; margin-top: 18px; }
+  .modal-btn-row button { flex: 1; padding: 11px; border-radius: 8px; font-size: 14px; cursor: pointer; border: none; }
+  #modalCancelBtn { background: #eef0f5; color: #555; }
+  #modalSubmitBtn { background: var(--accent); color: #fff; font-weight: bold; }
+  #modalMsg { font-size: 12.5px; color: #c0392b; margin-top: 8px; min-height: 16px; }
+
+  .hidden { display: none !important; }
+
+  /* ===== 로딩 오버레이 ===== */
+  #loadingOverlay { position: fixed; inset: 0; background: rgba(244,246,251,.92); z-index: 500; display: none; align-items: center; justify-content: center; }
+  #loadingOverlay.show { display: flex; }
+  #loadingBox { text-align: center; }
+  #loadingSpinner { width: 56px; height: 56px; margin: 0 auto 18px; border-radius: 50%; border: 6px solid #d9e0f5; border-top-color: var(--accent); animation: loadingSpin .8s linear infinite; }
+  @keyframes loadingSpin { to { transform: rotate(360deg); } }
+  #loadingText { font-size: 28px; font-weight: 900; color: var(--accent); letter-spacing: 1px; }
+
+  @media (max-width: 900px) {
+    #board { flex-direction: column; }
+    .column { max-width: 100%; }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ===== 로그인 ===== -->
+  <div id="loginScreen">
+    <div id="loginBox">
+      <h1>🗂️ 디지털 시민성 바이브코딩<br>아이디어 패들렛</h1>
+      <p>학번과 이름을 입력하면 게시판에 입장합니다.</p>
+      <input id="loginId" type="text" placeholder="학번 (교사는 0000 입력)">
+      <input id="loginName" type="text" placeholder="이름">
+      <button id="loginBtn" onclick="login()">입장하기</button>
+      <div id="loginMsg"></div>
+      <div class="login-hint">👩‍🏫 선생님은 학번란에 <b>0000</b>을 입력하고 이름을 적으면 교사로 입장합니다.</div>
+    </div>
+  </div>
+
+  <!-- ===== 로딩 오버레이 ===== -->
+  <div id="loadingOverlay">
+    <div id="loadingBox">
+      <div id="loadingSpinner"></div>
+      <div id="loadingText">로딩중...</div>
+    </div>
+  </div>
+
+  <!-- ===== 게시판 ===== -->
+  <div id="boardScreen" class="hidden" style="display:flex; flex-direction:column; flex:1;">
+    <header>
+      <h1>🗂️ 디지털 시민성 바이브코딩 아이디어 패들렛
+        <span>전교생·학부모·선생님 누구나 참여할 수 있는 학교 전체 게시판입니다.</span>
+      </h1>
+      <div id="whoami"></div>
+    </header>
+    <div id="board"></div>
+  </div>
+
+  <!-- ===== 글쓰기 모달 ===== -->
+  <div id="modalOverlay">
+    <div id="modalBox">
+      <h2 id="modalTitle"></h2>
+      <div class="modal-sub" id="modalDesc"></div>
+
+      <div id="authorTypeField" class="hidden">
+        <label>작성자 유형</label>
+        <div class="radio-row">
+          <label><input type="radio" name="authorType" value="학생"> 학생</label>
+          <label><input type="radio" name="authorType" value="학부모"> 학부모</label>
+          <label><input type="radio" name="authorType" value="교사"> 교사</label>
+        </div>
+      </div>
+
+      <label>제목 <span style="font-weight:normal;color:var(--sub);font-size:12px;">(선택)</span></label>
+      <input type="text" id="titleInput" placeholder="예) 급식 메뉴 투표 앱">
+
+      <label id="contentLabel">내용</label>
+      <textarea id="contentInput" placeholder=""></textarea>
+
+      <div id="modalMsg"></div>
+      <div class="modal-btn-row">
+        <button id="modalCancelBtn" onclick="closeModal()">취소</button>
+        <button id="modalSubmitBtn" onclick="submitPost()">게시하기</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+var APP_URL = 'https://script.google.com/macros/s/AKfycbzyeRDa2Swq71UlKMysPkDRxviqf6qTHNAJvwVRZxbT0d5KKn9_H2ehU8WU8xjjUzNeoQ/exec';
+var TEACHER_ID = '0000';
+
+var BOARDS = [
+  { key: 'idea', cls: 'idea', emoji: '💡', title: '아이디어', desc: '학교에 도움이 될 바이브코딩 아이디어를 자유롭게 올려주세요.', placeholder: '예) 급식 메뉴를 별점으로 평가하는 투표 앱을 만들면 좋겠어요.' },
+  { key: 'complaint', cls: 'complaint', emoji: '🤔', title: '불편함 나누기', desc: '학생·학부모·교사 누구나! 학교생활 속 불편한 점을 나눠주세요.', placeholder: '예) 상담 예약을 문자로만 받다 보니 놓치는 경우가 많아요.' },
+  { key: 'ask', cls: 'ask', emoji: '🙋', title: '병선샘께 기술 자문 (질문하기)', desc: '코딩하다 막힌 부분을 병선 선생님께 질문해보세요.', placeholder: '예) 구글 시트와 앱스 스크립트를 연결할 때 자꾸 오류가 나요. 어떻게 해결하나요?' }
+];
+
+var studentId = '';
+var studentName = '';
+var isTeacher = false;
+var currentPosts = [];
+var expandedComments = {};
+var expandedReplyFor = {};
+var composing = false;
+var lastPostsJson = '';
+var pollTimer = null;
+var pendingBoard = '';
+var editingPostId = null;
+
+function showLoading() { document.getElementById('loadingOverlay').classList.add('show'); }
+function hideLoading() { document.getElementById('loadingOverlay').classList.remove('show'); }
+
+function apiGet(params, silent) {
+  if (!silent) showLoading();
+  var qs = Object.keys(params).map(function (k) {
+    return encodeURIComponent(k) + '=' + encodeURIComponent(params[k] == null ? '' : params[k]);
+  }).join('&');
+  return fetch(APP_URL + '?' + qs).then(function (r) { return r.json(); }).finally(function () {
+    if (!silent) hideLoading();
+  });
+}
+function apiPost(data, silent) {
+  if (!silent) showLoading();
+  return fetch(APP_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify(data)
+  }).then(function (r) { return r.json(); }).finally(function () {
+    if (!silent) hideLoading();
+  });
+}
+
+function escapeHtml(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+function boardMeta(key) {
+  for (var i = 0; i < BOARDS.length; i++) if (BOARDS[i].key === key) return BOARDS[i];
+  return BOARDS[0];
+}
+
+// ===================== 로그인 =====================
+function login() {
+  var id = document.getElementById('loginId').value.trim();
+  var name = document.getElementById('loginName').value.trim();
+  var msg = document.getElementById('loginMsg');
+  if (!id || !name) { msg.textContent = '학번(또는 0000)과 이름을 모두 입력해주세요.'; return; }
+
+  studentId = id; studentName = name;
+  localStorage.setItem('dgs_padlet_login', JSON.stringify({ id: id, name: name }));
+  enterBoard();
+}
+
+function enterBoard() {
+  isTeacher = (studentId === TEACHER_ID);
+  document.getElementById('loginScreen').classList.add('hidden');
+  document.getElementById('boardScreen').classList.remove('hidden');
+  document.getElementById('whoami').innerHTML =
+    '<b>' + escapeHtml(studentName) + '</b>' + (isTeacher ? ' <span id="teacherTag">👩‍🏫 교사</span>' : ' (' + escapeHtml(studentId) + ')') +
+    '님 환영합니다<span id="logoutBtn" onclick="logout()">로그아웃</span>';
+  renderColumnsShell();
+  loadPosts(true);
+  pollTimer = setInterval(function () { loadPosts(false); }, 6000);
+}
+
+function logout() {
+  localStorage.removeItem('dgs_padlet_login');
+  location.reload();
+}
+
+(function tryAutoLogin() {
+  try {
+    var saved = JSON.parse(localStorage.getItem('dgs_padlet_login') || 'null');
+    if (saved && saved.id && saved.name) {
+      document.getElementById('loginId').value = saved.id;
+      document.getElementById('loginName').value = saved.name;
+    }
+  } catch (e) {}
+})();
+
+// ===================== 게시판 렌더 =====================
+function renderColumnsShell() {
+  var board = document.getElementById('board');
+  board.innerHTML = BOARDS.map(function (b) {
+    return '<div class="column" data-key="' + b.key + '">' +
+      '<div class="col-header ' + b.cls + '" onclick="openModal(\'' + b.key + '\')">' +
+        '<div class="col-header-top"><span>' + b.emoji + ' ' + b.title + ' +</span>' +
+        '<span class="col-count" id="count-' + b.cls + '"></span></div>' +
+        '<div class="col-desc">' + escapeHtml(b.desc) + '</div>' +
+      '</div>' +
+      '<div class="posts" id="posts-' + b.cls + '"></div>' +
+    '</div>';
+  }).join('');
+}
+
+function renderBoard(posts) {
+  currentPosts = posts;
+  BOARDS.forEach(function (b) {
+    var list = posts.filter(function (post) { return post.board === b.key; });
+    document.getElementById('count-' + b.cls).textContent = list.length + '개';
+    var container = document.getElementById('posts-' + b.cls);
+    if (list.length === 0) {
+      container.innerHTML = '<div class="empty-col">아직 게시물이 없어요.<br>제목을 눌러 첫 게시물을 올려보세요!</div>';
+      return;
+    }
+    container.innerHTML = list.map(renderPostCard).join('');
+  });
+}
+
+function typeBadge(type) {
+  if (!type) return '';
+  return ' <span class="type-badge ' + escapeHtml(type) + '">' + escapeHtml(type) + '</span>';
+}
+function cardBoardClass(post) {
+  return post.isTeacher ? 'teacher-post' : 'board-' + post.board;
+}
+function commentBoardClass(post, c) {
+  return c.isTeacher ? 'teacher-comment' : 'board-' + post.board;
+}
+
+function renderCommentActions(post, c) {
+  var actions = '<span class="comment-action" onclick="toggleReplyBox(\'' + c.id + '\')">답글</span>';
+  if (c.isMine) {
+    actions += ' <span class="comment-action danger" onclick="deleteComment(\'' + post.id + '\',\'' + c.id + '\')">삭제</span>';
+  }
+  return actions;
+}
+
+function renderReplyBox(post, parentId) {
+  if (!expandedReplyFor[parentId]) return '';
+  return '<div class="comment-input-row reply-input">' +
+    '<input type="text" id="reply-input-' + parentId + '" placeholder="답글을 남겨보세요" onkeydown="if(event.key===\'Enter\')submitReply(\'' + post.id + '\',\'' + parentId + '\')" onfocus="composing=true" onblur="composing=false">' +
+    '<button onclick="submitReply(\'' + post.id + '\',\'' + parentId + '\')">등록</button>' +
+  '</div>';
+}
+
+function renderComments(post) {
+  var topLevel = post.comments.filter(function (c) { return !c.parentId; });
+  if (topLevel.length === 0) {
+    return '<div style="font-size:12px;color:var(--sub);">아직 댓글이 없어요. 첫 댓글을 남겨보세요!</div>';
+  }
+  return topLevel.map(function (c) {
+    var replies = post.comments.filter(function (r) { return r.parentId === c.id; });
+    var html = '<div class="comment-item ' + commentBoardClass(post, c) + '">💬 <b>' + escapeHtml(c.studentName) + '</b>' +
+      (c.isTeacher ? typeBadge('교사') : '') + ': ' + escapeHtml(c.text) + '<span class="ctime">' + escapeHtml(c.time) + '</span> ' +
+      renderCommentActions(post, c) + '</div>';
+    html += replies.map(function (r) {
+      return '<div class="comment-item reply ' + commentBoardClass(post, r) + '">↳ <b>' + escapeHtml(r.studentName) + '</b>' +
+        (r.isTeacher ? typeBadge('교사') : '') + ': ' + escapeHtml(r.text) + '<span class="ctime">' + escapeHtml(r.time) + '</span> ' +
+        renderCommentActions(post, r) + '</div>';
+    }).join('');
+    html += renderReplyBox(post, c.id);
+    return html;
+  }).join('');
+}
+
+function renderPostCard(post) {
+  var expanded = !!expandedComments[post.id];
+  var totalCommentCount = post.comments.length;
+  var commentsHtml = '';
+  if (expanded) {
+    commentsHtml = '<div class="comment-box">' +
+      renderComments(post) +
+      '<div class="comment-input-row">' +
+        '<input type="text" id="comment-input-' + post.id + '" placeholder="댓글을 남겨보세요" onkeydown="if(event.key===\'Enter\')submitComment(\'' + post.id + '\')" onfocus="composing=true" onblur="composing=false">' +
+        '<button onclick="submitComment(\'' + post.id + '\')">등록</button>' +
+      '</div>' +
+    '</div>';
+  }
+
+  var editLink = post.isMine
+    ? ' <span class="comment-action" onclick="openEditModal(\'' + post.id + '\')">✏️ 수정</span>'
+    : '';
+  var titleHtml = post.title ? '<div class="post-title">' + escapeHtml(post.title) + '</div>' : '';
+
+  return '<div class="post-card ' + cardBoardClass(post) + '">' +
+    '<div class="post-meta"><b>' + escapeHtml(post.authorName) + '</b>' + typeBadge(post.authorType) + ' · ' + escapeHtml(post.timestamp) + editLink + '</div>' +
+    titleHtml +
+    '<div class="post-text">' + escapeHtml(post.content) + '</div>' +
+    '<div class="reaction-row">' +
+      '<button class="react-btn' + (post.myLiked ? ' active' : '') + '" onclick="toggleLike(\'' + post.id + '\')">👍 좋아요 ' + post.likeCount + '</button>' +
+    '</div>' +
+    '<div class="comment-toggle" onclick="toggleComments(\'' + post.id + '\')">💬 댓글 ' + totalCommentCount + '개 ' + (expanded ? '숨기기 ▲' : '보기 ▼') + '</div>' +
+    commentsHtml +
+  '</div>';
+}
+
+// ===================== 데이터 로드(폴링) =====================
+function loadPosts(force) {
+  apiGet({ action: 'getPadletPosts', studentId: studentId, studentName: studentName }, !force).then(function (res) {
+    if (!res.valid) return;
+    var json = JSON.stringify(res.posts);
+    if (!force && (composing || json === lastPostsJson)) return;
+    lastPostsJson = json;
+    renderBoard(res.posts);
+  }).catch(function () {});
+}
+
+// ===================== 글쓰기 모달 =====================
+function openModal(boardKey) {
+  editingPostId = null;
+  pendingBoard = boardKey;
+  var meta = boardMeta(boardKey);
+  document.getElementById('modalTitle').textContent = meta.emoji + ' ' + meta.title + ' 작성';
+  document.getElementById('modalDesc').textContent = meta.desc;
+  document.getElementById('titleInput').value = '';
+  document.getElementById('contentInput').value = '';
+  document.getElementById('contentInput').placeholder = meta.placeholder;
+  document.getElementById('modalMsg').textContent = '';
+  document.getElementById('modalSubmitBtn').textContent = '게시하기';
+
+  var typeField = document.getElementById('authorTypeField');
+  if (boardKey === 'complaint') {
+    typeField.classList.remove('hidden');
+    var defaultType = isTeacher ? '교사' : '학생';
+    var radios = document.getElementsByName('authorType');
+    for (var i = 0; i < radios.length; i++) radios[i].checked = (radios[i].value === defaultType);
+  } else {
+    typeField.classList.add('hidden');
+  }
+
+  document.getElementById('modalOverlay').classList.add('show');
+}
+
+function openEditModal(postId) {
+  var post = currentPosts.filter(function (p) { return p.id === postId; })[0];
+  if (!post) return;
+  editingPostId = postId;
+  pendingBoard = post.board;
+  var meta = boardMeta(post.board);
+  document.getElementById('modalTitle').textContent = '✏️ ' + meta.title + ' 게시물 수정';
+  document.getElementById('modalDesc').textContent = meta.desc;
+  document.getElementById('titleInput').value = post.title || '';
+  document.getElementById('contentInput').value = post.content;
+  document.getElementById('modalMsg').textContent = '';
+  document.getElementById('modalSubmitBtn').textContent = '수정하기';
+
+  var typeField = document.getElementById('authorTypeField');
+  if (post.board === 'complaint') {
+    typeField.classList.remove('hidden');
+    var radios = document.getElementsByName('authorType');
+    for (var i = 0; i < radios.length; i++) radios[i].checked = (radios[i].value === post.authorType);
+  } else {
+    typeField.classList.add('hidden');
+  }
+
+  document.getElementById('modalOverlay').classList.add('show');
+}
+
+function closeModal() {
+  editingPostId = null;
+  document.getElementById('modalOverlay').classList.remove('show');
+}
+
+function getSelectedAuthorType() {
+  var radios = document.getElementsByName('authorType');
+  for (var i = 0; i < radios.length; i++) if (radios[i].checked) return radios[i].value;
+  return '';
+}
+
+function submitPost() {
+  var title = document.getElementById('titleInput').value.trim();
+  var content = document.getElementById('contentInput').value.trim();
+  var msg = document.getElementById('modalMsg');
+
+  if (content.length < 3) { msg.textContent = '내용을 3자 이상 작성해주세요.'; return; }
+  if (pendingBoard === 'complaint' && !getSelectedAuthorType()) {
+    msg.textContent = '작성자 유형(학생/학부모/교사)을 선택해주세요.'; return;
+  }
+
+  var isEdit = !!editingPostId;
+  var data = {
+    action: isEdit ? 'editPadletPost' : 'submitPadletPost',
+    studentId: studentId, studentName: studentName,
+    board: pendingBoard, title: title, content: content
+  };
+  if (pendingBoard === 'complaint') data.authorType = getSelectedAuthorType();
+  if (isEdit) data.postId = editingPostId;
+
+  msg.textContent = isEdit ? '수정 중...' : '게시 중...';
+  apiPost(data).then(function (res) {
+    if (!res.success) { msg.textContent = res.message || (isEdit ? '수정에 실패했습니다.' : '게시에 실패했습니다.'); return; }
+    closeModal();
+    loadPosts(true);
+  }).catch(function () { msg.textContent = '서버 연결에 실패했습니다.'; });
+}
+
+// ===================== 좋아요 =====================
+function toggleLike(postId) {
+  apiPost({ action: 'togglePadletReaction', studentId: studentId, studentName: studentName, postId: postId }, true).then(function (res) {
+    if (!res.success) { alert(res.message || '좋아요 처리에 실패했습니다.'); return; }
+    currentPosts.forEach(function (p) {
+      if (p.id === postId) { p.likeCount = res.likeCount; p.myLiked = res.myLiked; }
+    });
+    renderBoard(currentPosts);
+    lastPostsJson = JSON.stringify(currentPosts);
+  }).catch(function () { alert('서버 연결에 실패했습니다.'); });
+}
+
+// ===================== 댓글 =====================
+function toggleComments(postId) {
+  expandedComments[postId] = !expandedComments[postId];
+  renderBoard(currentPosts);
+}
+
+function submitComment(postId) {
+  var input = document.getElementById('comment-input-' + postId);
+  var text = input.value.trim();
+  if (text.length < 1) return;
+  apiPost({ action: 'addPadletComment', studentId: studentId, studentName: studentName, postId: postId, text: text }).then(function (res) {
+    if (!res.success) { alert(res.message || '댓글 등록에 실패했습니다.'); return; }
+    currentPosts.forEach(function (p) { if (p.id === postId) p.comments = res.comments; });
+    composing = false;
+    renderBoard(currentPosts);
+    lastPostsJson = JSON.stringify(currentPosts);
+  }).catch(function () { alert('서버 연결에 실패했습니다.'); });
+}
+
+function toggleReplyBox(commentId) {
+  expandedReplyFor[commentId] = !expandedReplyFor[commentId];
+  renderBoard(currentPosts);
+}
+
+function submitReply(postId, parentId) {
+  var input = document.getElementById('reply-input-' + parentId);
+  var text = input.value.trim();
+  if (text.length < 1) return;
+  apiPost({ action: 'addPadletComment', studentId: studentId, studentName: studentName, postId: postId, text: text, parentId: parentId }).then(function (res) {
+    if (!res.success) { alert(res.message || '답글 등록에 실패했습니다.'); return; }
+    currentPosts.forEach(function (p) { if (p.id === postId) p.comments = res.comments; });
+    composing = false;
+    expandedReplyFor[parentId] = false;
+    renderBoard(currentPosts);
+    lastPostsJson = JSON.stringify(currentPosts);
+  }).catch(function () { alert('서버 연결에 실패했습니다.'); });
+}
+
+function deleteComment(postId, commentId) {
+  if (!confirm('이 댓글을 삭제할까요? (답글이 있다면 함께 삭제됩니다)')) return;
+  apiPost({ action: 'deletePadletComment', studentId: studentId, studentName: studentName, postId: postId, commentId: commentId }).then(function (res) {
+    if (!res.success) { alert(res.message || '댓글 삭제에 실패했습니다.'); return; }
+    currentPosts.forEach(function (p) { if (p.id === postId) p.comments = res.comments; });
+    renderBoard(currentPosts);
+    lastPostsJson = JSON.stringify(currentPosts);
+  }).catch(function () { alert('서버 연결에 실패했습니다.'); });
+}
+</script>
+</body>
+</html>
