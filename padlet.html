@@ -337,9 +337,17 @@ function escapeHtml(s) {
     .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 // escapeHtml로 이스케이프한 뒤 URL 패턴만 클릭 가능한 링크로 바꿔줌 (링크 공유 게시판 등에서 필요)
+// 문장 끝에 붙는 마침표/쉼표/괄호 등은 링크에서 떼어내 문장 밖으로 빼준다.
 function linkify(s) {
   return escapeHtml(s).replace(/(https?:\/\/[^\s<]+)/g, function (url) {
-    return '<a href="' + url + '" target="_blank" rel="noopener">' + url + '</a>';
+    var trail = '';
+    var m = url.match(/[.,!?;:)\]}'"]+$/);
+    if (m) {
+      trail = m[0];
+      url = url.slice(0, url.length - trail.length);
+    }
+    if (!url) return trail;
+    return '<a href="' + url + '" target="_blank" rel="noopener">' + url + '</a>' + trail;
   });
 }
 function boardMeta(key) {
