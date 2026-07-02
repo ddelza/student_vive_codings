@@ -515,9 +515,11 @@ function renderPostCard(post) {
   var editLink = (post.isMine || isAdmin)
     ? ' <span class="comment-action" onclick="openEditModal(\'' + post.id + '\')">✏️ 수정</span>'
     : '';
+  var deleteLink = (post.isMine || isAdmin)
+    ? ' <span class="comment-action danger" onclick="deletePost(\'' + post.id + '\')">🗑 삭제</span>'
+    : '';
   var adminLinks = isAdmin
-    ? ' <span class="comment-action" onclick="togglePin(\'' + post.id + '\')">' + (post.pinned ? '📌 고정 해제' : '📌 상단 고정') + '</span>' +
-      ' <span class="comment-action danger" onclick="deletePost(\'' + post.id + '\')">🗑 삭제</span>'
+    ? ' <span class="comment-action" onclick="togglePin(\'' + post.id + '\')">' + (post.pinned ? '📌 고정 해제' : '📌 상단 고정') + '</span>'
     : '';
   var pinBadge = post.pinned ? ' <span class="pin-badge">📌 고정</span>' : '';
   var titleHtml = post.title ? '<div class="post-title">' + escapeHtml(post.title) + pinBadge + '</div>' : (post.pinned ? '<div class="post-title">' + pinBadge + '</div>' : '');
@@ -545,7 +547,7 @@ function renderPostCard(post) {
     : '';
 
   return '<div class="post-card ' + cardBoardClass(post) + '">' +
-    '<div class="post-meta"><b>' + escapeHtml(post.authorName) + '</b>' + idTag(post.authorId, post.isTeacher) + typeBadge(post.authorType) + ' · ' + escapeHtml(post.timestamp) + editLink + adminLinks + '</div>' +
+    '<div class="post-meta"><b>' + escapeHtml(post.authorName) + '</b>' + idTag(post.authorId, post.isTeacher) + typeBadge(post.authorType) + ' · ' + escapeHtml(post.timestamp) + editLink + deleteLink + adminLinks + '</div>' +
     titleHtml +
     bodyToggle +
     bodyRest +
@@ -730,7 +732,9 @@ function togglePin(postId) {
 
 function deletePost(postId) {
   if (!confirm('이 게시물을 완전히 삭제할까요? (댓글도 모두 함께 삭제되며 되돌릴 수 없습니다)')) return;
-  apiPost({ action: 'deletePadletPost', postId: postId, adminPassword: adminPassword }).then(function (res) {
+  var data = { action: 'deletePadletPost', studentId: studentId, studentName: studentName, postId: postId };
+  if (isAdmin) data.adminPassword = adminPassword;
+  apiPost(data).then(function (res) {
     if (!res.success) { alert(res.message || '삭제에 실패했습니다.'); return; }
     loadPosts(true);
   }).catch(function () { alert('서버 연결에 실패했습니다.'); });
