@@ -67,6 +67,8 @@ function doPost(e) {
       result = deletePadletComment(data);
     } else if (action === 'togglePadletPin') {
       result = togglePadletPin(data);
+    } else if (action === 'togglePadletDefaultCollapse') {
+      result = togglePadletDefaultCollapse(data);
     } else if (action === 'deletePadletPost') {
       result = deletePadletPost(data);
     } else {
@@ -227,7 +229,7 @@ function getPadletSheet_() {
   var sheet = ss.getSheetByName(PADLET_SHEET_NAME);
   if (!sheet) {
     sheet = ss.insertSheet(PADLET_SHEET_NAME);
-    sheet.appendRow(['게시ID', '제출시각', '작성자ID', '작성자이름', '파트', '작성자유형', '제목', '내용', '좋아요수', '반응기록JSON', '댓글JSON', '고정여부']);
+    sheet.appendRow(['게시ID', '제출시각', '작성자ID', '작성자이름', '파트', '작성자유형', '제목', '내용', '좋아요수', '반응기록JSON', '댓글JSON', '고정여부', '기본접기여부']);
   }
   return sheet;
 }
@@ -337,7 +339,8 @@ function getPadletPosts(myId, myName) {
       comments: comments,
       isTeacher: padletIsTeacher_(row[2]),
       isMine: padletAuthorKey_(row[2], row[3]) === myKey,
-      pinned: row[11] === true || String(row[11]).toUpperCase() === 'TRUE'
+      pinned: row[11] === true || String(row[11]).toUpperCase() === 'TRUE',
+      defaultCollapsed: row[12] === true || String(row[12]).toUpperCase() === 'TRUE'
     });
   }
   posts.sort(function (a, b) {
@@ -382,7 +385,7 @@ function submitPadletPost(data) {
   sheet.getRange(nextRow, 3).setNumberFormat('@');
   sheet.appendRow([
     id, new Date(), studentId, studentName, data.board, authorType,
-    (data.title || '').trim(), data.content.trim(), 0, '{}', '[]', false
+    (data.title || '').trim(), data.content.trim(), 0, '{}', '[]', false, false
   ]);
   return { success: true, id: id };
 }
@@ -543,6 +546,23 @@ function togglePadletPin(data) {
   var pinned = !(current === true || String(current).toUpperCase() === 'TRUE');
   sheet.getRange(rowNum, 12).setValue(pinned);
   return { success: true, pinned: pinned };
+}
+
+// 관리자 전용: 특정 게시물을 기본적으로 접어서(제목/본문 숨김) 보여줄지 토글
+// (게시판 종류와 상관없이 이 글 하나만 접어두고 싶을 때 사용)
+function togglePadletDefaultCollapse(data) {
+  if (!verifyPadletAdmin_(data.adminPassword)) {
+    return { success: false, message: '관리자 비밀번호가 일치하지 않습니다.' };
+  }
+
+  var sheet = getPadletSheet_();
+  var rowNum = findPadletRow_(sheet, data.postId);
+  if (rowNum === -1) return { success: false, message: '게시물을 찾을 수 없습니다.' };
+
+  var current = sheet.getRange(rowNum, 13).getValue();
+  var collapsed = !(current === true || String(current).toUpperCase() === 'TRUE');
+  sheet.getRange(rowNum, 13).setValue(collapsed);
+  return { success: true, defaultCollapsed: collapsed };
 }
 
 // 관리자 전용: 게시물 전체 삭제 (댓글 포함, 행 자체를 지움)
