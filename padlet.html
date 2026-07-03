@@ -546,14 +546,15 @@ function renderPostCard(post) {
     ? ' <span class="comment-action danger" onclick="deletePost(\'' + post.id + '\')">🗑 삭제</span>'
     : '';
   var adminLinks = isAdmin
-    ? ' <span class="comment-action" onclick="togglePin(\'' + post.id + '\')">' + (post.pinned ? '📌 고정 해제' : '📌 상단 고정') + '</span>'
+    ? ' <span class="comment-action" onclick="togglePin(\'' + post.id + '\')">' + (post.pinned ? '📌 고정 해제' : '📌 상단 고정') + '</span>' +
+      ' <span class="comment-action" onclick="toggleDefaultCollapse(\'' + post.id + '\')">' + (post.defaultCollapsed ? '👁 기본 펼치기로' : '🙈 기본 접어두기') + '</span>'
     : '';
   var pinBadge = post.pinned ? ' <span class="pin-badge">📌 고정</span>' : '';
   var titleHtml = post.title ? '<div class="post-title">' + escapeHtml(post.title) + pinBadge + '</div>' : (post.pinned ? '<div class="post-title">' + pinBadge + '</div>' : '');
 
   // 팁공유 게시판의 제목 있는 글(주로 안내/매뉴얼)만 기본적으로 내용을 접어서,
   // 제목만 보고 필요할 때 펼쳐 읽게 한다. 다른 게시판은 항상 펼쳐서 보여준다.
-  var collapsible = post.board === 'tips' && !!post.title;
+  var collapsible = (post.board === 'tips' && !!post.title) || !!post.defaultCollapsed;
   var bodyOpen = !collapsible || !!expandedPostBody[post.id];
   var bodyToggle = collapsible
     ? '<div class="comment-toggle" onclick="toggleBody(\'' + post.id + '\')">' + (bodyOpen ? '📄 내용 접기 ▲' : '📄 내용 펼쳐서 보기 ▼') + '</div>'
@@ -753,6 +754,13 @@ function deleteComment(postId, commentId) {
 function togglePin(postId) {
   apiPost({ action: 'togglePadletPin', postId: postId, adminPassword: adminPassword }, true).then(function (res) {
     if (!res.success) { alert(res.message || '고정 처리에 실패했습니다.'); return; }
+    loadPosts(true);
+  }).catch(function () { alert('서버 연결에 실패했습니다.'); });
+}
+
+function toggleDefaultCollapse(postId) {
+  apiPost({ action: 'togglePadletDefaultCollapse', postId: postId, adminPassword: adminPassword }, true).then(function (res) {
+    if (!res.success) { alert(res.message || '처리에 실패했습니다.'); return; }
     loadPosts(true);
   }).catch(function () { alert('서버 연결에 실패했습니다.'); });
 }
