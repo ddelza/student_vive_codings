@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>디지털 시민성 바이브코딩 대회 제출</title>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+  body { font-family: 'Segoe UI', 'Malgun Gothic', sans-serif; background: #f4f6fb; margin: 0; padding: 24px; color: #1c2238; }
+  .container { max-width: 420px; margin: 60px auto 0; background: #fff; border-radius: 14px; padding: 32px 28px; box-shadow: 0 6px 24px rgba(20,30,60,.08); text-align: center; }
+  h1 { font-size: 19px; margin: 0 0 6px; }
+  p.sub { font-size: 13px; color: #6b7384; margin: 0 0 22px; line-height: 1.5; }
+  input { width: 100%; padding: 11px 12px; margin-bottom: 10px; border: 1px solid #e2e6f0; border-radius: 8px; font-size: 14px; box-sizing: border-box; }
+  #googleBtnBox { display: flex; justify-content: center; margin-top: 14px; }
+  #loginMsg { font-size: 13px; color: #c0392b; margin-top: 12px; min-height: 18px; }
+  #welcomeScreen { display: none; }
+  #welcomeScreen h1 { margin-bottom: 14px; }
+  #welcomeScreen .name { font-size: 22px; font-weight: bold; color: #2d6cdf; }
+</style>
+</head>
+<body>
+
+<div class="container" id="loginScreen">
+  <h1>🚀 디지털 시민성 바이브코딩 대회</h1>
+  <p class="sub">학번과 이름을 입력한 뒤, 학교 구글 계정으로 로그인해서 본인 확인을 완료하세요.</p>
+  <input id="studentIdInput" type="text" placeholder="학번 (예: 3101)">
+  <input id="studentNameInput" type="text" placeholder="이름">
+  <div id="googleBtnBox"></div>
+  <div id="loginMsg"></div>
+</div>
+
+<div class="container" id="welcomeScreen">
+  <h1>✅ 인증 완료</h1>
+  <p class="sub"><span class="name" id="welcomeName"></span>님, 확인되었습니다.</p>
+  <p class="sub">제출 양식은 곧 이어서 준비됩니다.</p>
+</div>
+
+<script>
+var APP_URL = 'https://script.google.com/macros/s/AKfycbyVURDEKD9aIdbaCx8W0lH97FaXrIEWb3trB2G4UqO3wM7gcjdZDTEL2qQtlJuZReg/exec';
+var GOOGLE_CLIENT_ID = 'YOUR_GOOGLE_CLIENT_ID';
+
+function handleCredentialResponse(response) {
+  var studentId = document.getElementById('studentIdInput').value.trim();
+  var studentName = document.getElementById('studentNameInput').value.trim();
+  var msg = document.getElementById('loginMsg');
+
+  if (!studentId || !studentName) {
+    msg.textContent = '학번과 이름을 먼저 입력한 뒤 로그인해주세요.';
+    return;
+  }
+
+  msg.textContent = '확인 중...';
+  fetch(APP_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify({
+      action: 'verifyContestLogin',
+      studentId: studentId,
+      studentName: studentName,
+      credential: response.credential
+    })
+  })
+    .then(function (r) { return r.json(); })
+    .then(function (res) {
+      if (!res.success) {
+        msg.textContent = res.message || '인증에 실패했습니다.';
+        return;
+      }
+      document.getElementById('welcomeName').textContent = res.studentName + ' (' + res.studentId + ')';
+      document.getElementById('loginScreen').style.display = 'none';
+      document.getElementById('welcomeScreen').style.display = 'block';
+    })
+    .catch(function () {
+      msg.textContent = '서버 연결에 실패했습니다. 잠시 후 다시 시도해주세요.';
+    });
+}
+
+window.onload = function () {
+  google.accounts.id.initialize({
+    client_id: GOOGLE_CLIENT_ID,
+    callback: handleCredentialResponse
+  });
+  google.accounts.id.renderButton(
+    document.getElementById('googleBtnBox'),
+    { theme: 'outline', size: 'large', text: 'signin_with' }
+  );
+};
+</script>
+</body>
+</html>
