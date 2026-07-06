@@ -4,7 +4,7 @@ var PADLET_ROSTER_SHEET_ID = "1yvm2kKox1CenK2VLJ43HOF3Ik4spWxd9D87A6upHClU"; // 
 var PADLET_ROSTER_GID = 62759410; // 명단이 들어있는 탭의 gid
 
 var CONTEST_ROSTER_SHEET_ID = "1FZxiI3H_Yw1MD0CKfWKsenRP4D0PWA2pdVReTYNvGQE"; // 학번/성명/구글계정 명단 (대회 제출페이지 구글 로그인 검증용)
-var CONTEST_GOOGLE_CLIENT_ID = "YOUR_GOOGLE_CLIENT_ID"; // Google Cloud Console에서 발급받은 OAuth 클라이언트 ID로 교체할 것
+var CONTEST_GOOGLE_CLIENT_ID = "648164034565-e3ha6tes7n8nd65ui0hs7m0v0nhpmdcp.apps.googleusercontent.com";
 
 function doGet(e) {
   var page   = (e && e.parameter) ? e.parameter.page   : '';
