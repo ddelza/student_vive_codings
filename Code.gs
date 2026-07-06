@@ -6,6 +6,14 @@ var PADLET_ROSTER_GID = 62759410; // 명단이 들어있는 탭의 gid
 var CONTEST_ROSTER_SHEET_ID = "1FZxiI3H_Yw1MD0CKfWKsenRP4D0PWA2pdVReTYNvGQE"; // 학번/성명/구글계정 명단 (대회 제출페이지 구글 로그인 검증용)
 var CONTEST_GOOGLE_CLIENT_ID = "648164034565-e3ha6tes7n8nd65ui0hs7m0v0nhpmdcp.apps.googleusercontent.com";
 
+// 이 프로젝트가 UrlFetchApp(외부 요청) 권한을 처음 쓸 때, 웹앱 호출만으로는 권한 승인 창이 뜨지 않는다.
+// Apps Script 편집기에서 이 함수를 직접 한 번 실행해서(▶ 실행) 권한 승인 팝업을 띄우고 "허용"을 눌러야
+// verifyContestLogin의 UrlFetchApp.fetch(tokeninfo) 호출이 정상 동작한다. 승인 후 반드시 재배포할 것.
+function testUrlFetchPermission() {
+  UrlFetchApp.fetch('https://www.google.com');
+  Logger.log('성공');
+}
+
 function doGet(e) {
   var page   = (e && e.parameter) ? e.parameter.page   : '';
   var action = (e && e.parameter) ? e.parameter.action : '';
