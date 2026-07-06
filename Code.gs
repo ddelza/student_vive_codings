@@ -3,6 +3,9 @@ var SHEET_ID = "19MC5UCVgJWCNTDk83g0Af30iUkDX7s6pXwZGWIHu6-w";
 var PADLET_ROSTER_SHEET_ID = "1yvm2kKox1CenK2VLJ43HOF3Ik4spWxd9D87A6upHClU"; // 전교생 학번/성명 명단 (padlet 로그인 검증용)
 var PADLET_ROSTER_GID = 62759410; // 명단이 들어있는 탭의 gid
 
+var CONTEST_ROSTER_SHEET_ID = "1FZxiI3H_Yw1MD0CKfWKsenRP4D0PWA2pdVReTYNvGQE"; // 학번/성명/구글계정 명단 (대회 제출페이지 구글 로그인 검증용)
+var CONTEST_GOOGLE_CLIENT_ID = "YOUR_GOOGLE_CLIENT_ID"; // Google Cloud Console에서 발급받은 OAuth 클라이언트 ID로 교체할 것
+
 function doGet(e) {
   var page   = (e && e.parameter) ? e.parameter.page   : '';
   var action = (e && e.parameter) ? e.parameter.action : '';
@@ -71,6 +74,8 @@ function doPost(e) {
       result = togglePadletDefaultCollapse(data);
     } else if (action === 'deletePadletPost') {
       result = deletePadletPost(data);
+    } else if (action === 'verifyContestLogin') {
+      result = verifyContestLogin(data);
     } else {
       result = { success: false, message: '알 수 없는 action: ' + action };
     }
@@ -588,4 +593,66 @@ function deletePadletPost(data) {
 
   sheet.deleteRow(rowNum);
   return { success: true };
+}
+
+// ===================== contest.html (대회 제출페이지 구글 로그인) =====================
+
+function contestNormalize_(s) {
+  return String(s || '').replace(/\s+/g, '');
+}
+
+// 명단 시트: A열=학번, B열=성명, C열=구글계정 (전교생, 첫 번째 탭)
+function getContestRosterSheet_() {
+  return SpreadsheetApp.openById(CONTEST_ROSTER_SHEET_ID).getSheets()[0];
+}
+
+// 구글 로그인으로 받은 credential(JWT)이 진짜 구글이 발급한 것인지 서버에서 재확인하고 이메일을 꺼냄
+function verifyGoogleCredential_(credential) {
+  var res = UrlFetchApp.fetch(
+    'https://oauth2.googleapis.com/tokeninfo?id_token=' + encodeURIComponent(credential),
+    { muteHttpExceptions: true }
+  );
+  if (res.getResponseCode() !== 200) return null;
+
+  var payload = JSON.parse(res.getContentText());
+  if (payload.aud !== CONTEST_GOOGLE_CLIENT_ID) return null; // 우리 앱용으로 발급된 토큰이 아니면 거부
+
+  return payload.email || null;
+}
+
+// 학번+이름+구글이메일이 명단의 같은 행에서 전부 일치해야 통과
+function verifyContestLogin(data) {
+  var studentId = String(data.studentId || '').trim();
+  var studentName = contestNormalize_(data.studentName);
+  if (!studentId || !studentName) {
+    return { success: false, message: '학번과 이름을 입력해주세요.' };
+  }
+  if (!data.credential) {
+    return { success: false, message: '구글 로그인 정보가 없습니다.' };
+  }
+
+  var email = verifyGoogleCredential_(data.credential);
+  if (!email) {
+    return { success: false, message: '구글 로그인 확인에 실패했습니다. 다시 시도해주세요.' };
+  }
+
+  var sheet = getContestRosterSheet_();
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 2) return { success: false, message: '명단을 불러올 수 없습니다.' };
+
+  var data2d = sheet.getRange(2, 1, lastRow - 1, 3).getValues(); // A~C열
+  for (var i = 0; i < data2d.length; i++) {
+    var rowId = String(data2d[i][0] || '').trim();
+    var rowName = contestNormalize_(data2d[i][1]);
+    var rowEmail = String(data2d[i][2] || '').trim().toLowerCase();
+
+    if (rowEmail && rowEmail === email.toLowerCase()) {
+      if (rowId === studentId && rowName === studentName) {
+        return { success: true, studentId: rowId, studentName: data2d[i][1] };
+      }
+      return { success: false, message: '입력한 학번 또는 이름이 구글 계정과 일치하지 않습니다.' };
+    }
+  }
+
+  return { success: false, message: '명단에서 이 구글 계정을 찾을 수 없습니다.' };
 }
