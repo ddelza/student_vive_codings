@@ -647,6 +647,13 @@ function verifyContestLogin(data) {
     var rowEmail = String(data2d[i][2] || '').trim().toLowerCase();
 
     if (rowEmail && rowEmail === email.toLowerCase()) {
+      if (!rowId) {
+        // 학번 칸이 비어있는 행 = 교사. 학번은 비교하지 않고 이름만 확인.
+        if (rowName === studentName) {
+          return { success: true, studentId: studentId, studentName: data2d[i][1] };
+        }
+        return { success: false, message: '입력한 이름이 구글 계정과 일치하지 않습니다.' };
+      }
       if (rowId === studentId && rowName === studentName) {
         return { success: true, studentId: rowId, studentName: data2d[i][1] };
       }
