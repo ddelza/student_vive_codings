@@ -64,7 +64,8 @@
   #adminBtn.on { background: #2c2f3a; color: #fff; border-color: #2c2f3a; }
   .header-link-btn {
     font-size: 12px; font-weight: bold; color: var(--accent); background: #eaf1ff; border: 1px solid #d3e2fb;
-    border-radius: 999px; padding: 6px 12px; text-decoration: none; white-space: nowrap;
+    border-radius: 999px; padding: 6px 12px; text-decoration: none; white-space: nowrap; cursor: pointer;
+    font-family: inherit;
   }
   .header-link-btn:hover { background: #dde9fd; }
   .pin-badge { font-size: 10.5px; font-weight: bold; color: #a8590a; background: #ffe3b8; border-radius: 999px; padding: 2px 7px; margin-left: 5px; }
@@ -229,6 +230,7 @@
       <div id="headerRight" style="display:flex;align-items:center;flex-wrap:wrap;gap:8px;">
         <a class="header-link-btn" href="https://ddelza.github.io/student_vive_codings/" target="_blank" rel="noopener">📤 제출링크</a>
         <a class="header-link-btn" href="https://ddelza.github.io/student_vive_codings/gallery.html" target="_blank" rel="noopener">🖼️ 친구들 작품 보기</a>
+        <button class="header-link-btn" id="editSheetBtn" onclick="onEditSheetBtnClick()">📝 패들릿 직접 편집</button>
         <div id="whoami"></div>
         <button id="adminBtn" onclick="onAdminBtnClick()">🔐 관리자모드</button>
       </div>
@@ -283,6 +285,7 @@
 <script>
 var APP_URL = 'https://script.google.com/macros/s/AKfycbyVURDEKD9aIdbaCx8W0lH97FaXrIEWb3trB2G4UqO3wM7gcjdZDTEL2qQtlJuZReg/exec';
 var TEACHER_ID = '0000';
+var PADLET_SHEET_URL = 'https://docs.google.com/spreadsheets/d/19MC5UCVgJWCNTDk83g0Af30iUkDX7s6pXwZGWIHu6-w/edit?gid=0#gid=0';
 
 var BOARDS = [
   { key: 'idea', cls: 'idea', emoji: '💡', title: '아이디어', desc: '학교에 도움이 될 바이브코딩 아이디어를 자유롭게 올려주세요.', placeholder: '예) 급식 메뉴를 별점으로 평가하는 투표 앱을 만들면 좋겠어요.' },
@@ -408,6 +411,19 @@ function onAdminBtnClick() {
 
 function closeAdminModal() {
   document.getElementById('adminModalOverlay').classList.remove('show');
+}
+
+function onEditSheetBtnClick() {
+  if (isAdmin) {
+    window.open(PADLET_SHEET_URL, '_blank');
+    return;
+  }
+  var pw = prompt('관리자 전용입니다. 비밀번호를 입력하세요.');
+  if (pw === null) return;
+  apiGet({ action: 'verifyPadletAdmin', password: pw }, true).then(function (res) {
+    if (!res.valid) { alert('비밀번호가 일치하지 않습니다.'); return; }
+    window.open(PADLET_SHEET_URL, '_blank');
+  }).catch(function () { alert('서버 연결에 실패했습니다.'); });
 }
 
 function submitAdminPassword() {
