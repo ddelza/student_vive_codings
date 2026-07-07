@@ -7,20 +7,31 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <style>
   body { font-family: 'Segoe UI', 'Malgun Gothic', sans-serif; background: #f4f6fb; margin: 0; padding: 24px; color: #1c2238; }
-  .container { max-width: 420px; margin: 60px auto 0; background: #fff; border-radius: 14px; padding: 32px 28px; box-shadow: 0 6px 24px rgba(20,30,60,.08); text-align: center; }
+  .container { max-width: 480px; margin: 40px auto 0; background: #fff; border-radius: 14px; padding: 32px 28px; box-shadow: 0 6px 24px rgba(20,30,60,.08); }
+  .container.center { text-align: center; }
   h1 { font-size: 19px; margin: 0 0 6px; }
   p.sub { font-size: 13px; color: #6b7384; margin: 0 0 22px; line-height: 1.5; }
-  input { width: 100%; padding: 11px 12px; margin-bottom: 10px; border: 1px solid #e2e6f0; border-radius: 8px; font-size: 14px; box-sizing: border-box; }
+  input, textarea {
+    width: 100%; padding: 11px 12px; margin-bottom: 4px; border: 1px solid #e2e6f0; border-radius: 8px;
+    font-size: 14px; box-sizing: border-box; font-family: inherit;
+  }
+  textarea { min-height: 78px; resize: vertical; line-height: 1.5; }
+  label { display: block; font-size: 13.5px; font-weight: bold; margin: 18px 0 6px; }
   #googleBtnBox { display: flex; justify-content: center; margin-top: 14px; }
-  #loginMsg { font-size: 13px; color: #c0392b; margin-top: 12px; min-height: 18px; }
-  #welcomeScreen { display: none; }
-  #welcomeScreen h1 { margin-bottom: 14px; }
-  #welcomeScreen .name { font-size: 22px; font-weight: bold; color: #2d6cdf; }
+  #loginMsg, #submitMsg { font-size: 13px; color: #c0392b; margin-top: 12px; min-height: 18px; }
+  #formScreen, #doneScreen { display: none; }
+  .name { font-size: 15px; font-weight: bold; color: #2d6cdf; }
+  #submitBtn {
+    width: 100%; margin-top: 22px; padding: 12px; background: #2d6cdf; color: #fff; border: none;
+    border-radius: 8px; font-size: 15px; font-weight: bold; cursor: pointer;
+  }
+  #submitBtn:hover { background: #1f56b8; }
+  #submitBtn:disabled { background: #b7c4e0; cursor: not-allowed; }
 </style>
 </head>
 <body>
 
-<div class="container" id="loginScreen">
+<div class="container center" id="loginScreen">
   <h1>🚀 디지털 시민성 바이브코딩 대회</h1>
   <p class="sub">학번과 이름을 입력한 뒤, 학교 구글 계정으로 로그인해서 본인 확인을 완료하세요.</p>
   <input id="studentIdInput" type="text" placeholder="학번 (예: 3101)">
@@ -29,15 +40,37 @@
   <div id="loginMsg"></div>
 </div>
 
-<div class="container" id="welcomeScreen">
-  <h1>✅ 인증 완료</h1>
-  <p class="sub"><span class="name" id="welcomeName"></span>님, 확인되었습니다.</p>
-  <p class="sub">제출 양식은 곧 이어서 준비됩니다.</p>
+<div class="container" id="formScreen">
+  <h1>📝 작품 제출</h1>
+  <p class="sub"><span class="name" id="formWhoami"></span>님, 아래 내용을 작성해주세요.</p>
+
+  <label>작품명</label>
+  <input id="titleInput" type="text" placeholder="제작한 앱이 어떤 앱인지 알 수 있도록, 작품 이름을 입력해주세요">
+
+  <label>이 앱은 어떤 불편함을 해결할 수 있을까요? 또는 어떤 사람들을 위한 앱일까요?</label>
+  <textarea id="forWhomInput" placeholder="예) ___를 하는 교사, ___를 느끼는 학생, ___가 필요한 학부모 등등.."></textarea>
+
+  <label>작품(앱)의 링크를 제출해주세요.</label>
+  <textarea id="linkInput" placeholder="아이디어만 있고 아직 못 만들었다면: 비워두세요! / 제미나이 안에서만 완성했다면: share.gemini.google.com/... / 구글스프레드시트 연결 및 배포까지 완료했다면: https://script.google.com/... / 깃허브까지 만들었다면: ___.github.io/..."></textarea>
+
+  <label>이 앱이 어떤 기능을 가지고 있는지 간단히 설명해주세요.</label>
+  <textarea id="descInput" placeholder="예) 학생이 로그인 후 익명으로 학교생활 속 불편한 점을 제보하면 목록에 저장됩니다. 학생은 다른 학생들의 제보에 공감 버튼을 누를 수 있고, 관리자(선생님)는 모든 제보를 확인하고 처리 상태를 남길 수 있습니다."></textarea>
+
+  <button id="submitBtn" onclick="submitEntry()">제출하기</button>
+  <div id="submitMsg"></div>
+</div>
+
+<div class="container center" id="doneScreen">
+  <h1>🎉 제출 완료</h1>
+  <p class="sub">작품이 성공적으로 제출되었습니다. 감사합니다!</p>
 </div>
 
 <script>
 var APP_URL = 'https://script.google.com/macros/s/AKfycbzyeRDa2Swq71UlKMysPkDRxviqf6qTHNAJvwVRZxbT0d5KKn9_H2ehU8WU8xjjUzNeoQ/exec';
 var GOOGLE_CLIENT_ID = '648164034565-e3ha6tes7n8nd65ui0hs7m0v0nhpmdcp.apps.googleusercontent.com';
+
+var loggedInStudentId = '';
+var loggedInStudentName = '';
 
 function handleCredentialResponse(response) {
   var studentId = document.getElementById('studentIdInput').value.trim();
@@ -66,12 +99,57 @@ function handleCredentialResponse(response) {
         msg.textContent = res.message || '인증에 실패했습니다.';
         return;
       }
-      document.getElementById('welcomeName').textContent = res.studentName + ' (' + res.studentId + ')';
+      loggedInStudentId = res.studentId;
+      loggedInStudentName = res.studentName;
+      document.getElementById('formWhoami').textContent = res.studentName + ' (' + res.studentId + ')';
       document.getElementById('loginScreen').style.display = 'none';
-      document.getElementById('welcomeScreen').style.display = 'block';
+      document.getElementById('formScreen').style.display = 'block';
     })
     .catch(function () {
       msg.textContent = '서버 연결에 실패했습니다. 잠시 후 다시 시도해주세요.';
+    });
+}
+
+function submitEntry() {
+  var title = document.getElementById('titleInput').value.trim();
+  var forWhom = document.getElementById('forWhomInput').value.trim();
+  var link = document.getElementById('linkInput').value.trim();
+  var description = document.getElementById('descInput').value.trim();
+  var msg = document.getElementById('submitMsg');
+  var btn = document.getElementById('submitBtn');
+
+  if (!title) { msg.textContent = '작품명을 입력해주세요.'; return; }
+  if (!forWhom) { msg.textContent = '어떤 사람들을 위한 앱인지 입력해주세요.'; return; }
+  if (!description) { msg.textContent = '앱의 기능을 간단히 설명해주세요.'; return; }
+
+  btn.disabled = true;
+  msg.textContent = '제출 중...';
+  fetch(APP_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify({
+      action: 'submitContestEntry',
+      studentId: loggedInStudentId,
+      studentName: loggedInStudentName,
+      title: title,
+      forWhom: forWhom,
+      link: link,
+      description: description
+    })
+  })
+    .then(function (r) { return r.json(); })
+    .then(function (res) {
+      if (!res.success) {
+        msg.textContent = res.message || '제출에 실패했습니다.';
+        btn.disabled = false;
+        return;
+      }
+      document.getElementById('formScreen').style.display = 'none';
+      document.getElementById('doneScreen').style.display = 'block';
+    })
+    .catch(function () {
+      msg.textContent = '서버 연결에 실패했습니다. 잠시 후 다시 시도해주세요.';
+      btn.disabled = false;
     });
 }
 
@@ -88,4 +166,3 @@ window.onload = function () {
 </script>
 </body>
 </html>
-<!-- redeploy trigger 1783406308 -->
