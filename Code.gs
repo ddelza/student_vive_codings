@@ -704,10 +704,11 @@ function submitContestEntry(data) {
   if (!description) return { success: false, message: '앱의 기능을 간단히 설명해주세요.' };
 
   var sheet = getContestEntrySheet_();
-  // 학번 열이 자동으로 숫자로 변환되어 앞자리가 사라지는 걸 막기 위해 텍스트 서식으로 미리 고정
   var nextRow = sheet.getLastRow() + 1;
-  sheet.getRange(nextRow, 1).setNumberFormat('@');
-  sheet.appendRow([studentId, studentName, title, forWhom, link, description]);
+  // 먼저 학번 칸을 비워서 행을 추가한 뒤, 그 칸만 텍스트 서식으로 고정하고 값을 다시 써서
+  // "0000" 같은 학번이 appendRow 과정에서 숫자 0으로 변환되는 걸 확실히 막는다.
+  sheet.appendRow(['', studentName, title, forWhom, link, description]);
+  sheet.getRange(nextRow, 1).setNumberFormat('@').setValue(studentId);
 
   return { success: true };
 }
