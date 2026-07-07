@@ -723,9 +723,10 @@ function submitContestEntry(data) {
 function getContestEntries() {
   var sheet = getContestEntrySheet_();
   var lastRow = sheet.getLastRow();
-  if (lastRow < 2) return [];
+  if (lastRow < 1) return [];
 
-  var data = sheet.getRange(2, 1, lastRow - 1, 6).getValues();
+  // 이 탭은 헤더 행 없이 1행부터 바로 데이터가 시작됨
+  var data = sheet.getRange(1, 1, lastRow, 6).getValues();
   var entries = [];
   for (var i = 0; i < data.length; i++) {
     if (!data[i][1]) continue; // 이름이 없는 빈 행은 건너뜀
