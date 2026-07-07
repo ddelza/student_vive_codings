@@ -84,6 +84,8 @@ function doPost(e) {
       result = deletePadletPost(data);
     } else if (action === 'verifyContestLogin') {
       result = verifyContestLogin(data);
+    } else if (action === 'submitContestEntry') {
+      result = submitContestEntry(data);
     } else {
       result = { success: false, message: '알 수 없는 action: ' + action };
     }
@@ -670,4 +672,42 @@ function verifyContestLogin(data) {
   }
 
   return { success: false, message: '명단에서 이 구글 계정을 찾을 수 없습니다.' };
+}
+
+// contest.html 제출 폼 데이터를 "대회출품" 탭에 [학번, 이름, 작품명, for whom, 링크, 기능 설명] 순으로 기록
+var CONTEST_ENTRY_SHEET_NAME = '대회출품';
+
+function getContestEntrySheet_() {
+  var ss = SpreadsheetApp.openById(SHEET_ID);
+  var sheet = ss.getSheetByName(CONTEST_ENTRY_SHEET_NAME);
+  if (!sheet) {
+    sheet = ss.insertSheet(CONTEST_ENTRY_SHEET_NAME);
+    sheet.appendRow(['학번', '이름', '작품명', 'for whom', '링크', '기능 설명']);
+  }
+  return sheet;
+}
+
+function submitContestEntry(data) {
+  var studentId = String(data.studentId || '').trim();
+  var studentName = String(data.studentName || '').trim();
+  if (!studentId || !studentName) {
+    return { success: false, message: '로그인 정보가 없습니다. 다시 로그인해주세요.' };
+  }
+
+  var title = String(data.title || '').trim();
+  var forWhom = String(data.forWhom || '').trim();
+  var link = String(data.link || '').trim();
+  var description = String(data.description || '').trim();
+
+  if (!title) return { success: false, message: '작품명을 입력해주세요.' };
+  if (!forWhom) return { success: false, message: '어떤 사람들을 위한 앱인지 입력해주세요.' };
+  if (!description) return { success: false, message: '앱의 기능을 간단히 설명해주세요.' };
+
+  var sheet = getContestEntrySheet_();
+  // 학번 열이 자동으로 숫자로 변환되어 앞자리가 사라지는 걸 막기 위해 텍스트 서식으로 미리 고정
+  var nextRow = sheet.getLastRow() + 1;
+  sheet.getRange(nextRow, 1).setNumberFormat('@');
+  sheet.appendRow([studentId, studentName, title, forWhom, link, description]);
+
+  return { success: true };
 }
