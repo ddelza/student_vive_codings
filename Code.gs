@@ -43,6 +43,12 @@ function doGet(e) {
       .setMimeType(ContentService.MimeType.JSON);
   }
 
+  if (action === 'getContestEntries') {
+    return ContentService
+      .createTextOutput(JSON.stringify(getContestEntries()))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+
   if (page === 'gallery') {
     return HtmlService.createHtmlOutputFromFile('Gallery')
         .setTitle('학생 작품 갤러리')
@@ -711,4 +717,26 @@ function submitContestEntry(data) {
   sheet.getRange(nextRow, 1).setNumberFormat('@').setValue(studentId);
 
   return { success: true };
+}
+
+// contest_gallery.html에서 호출: "대회출품" 탭 전체를 읽어서 최신 제출이 먼저 오도록 뒤집어 반환
+function getContestEntries() {
+  var sheet = getContestEntrySheet_();
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 2) return [];
+
+  var data = sheet.getRange(2, 1, lastRow - 1, 6).getValues();
+  var entries = [];
+  for (var i = 0; i < data.length; i++) {
+    if (!data[i][1]) continue; // 이름이 없는 빈 행은 건너뜀
+    entries.push({
+      studentId: String(data[i][0] || ''),
+      studentName: data[i][1],
+      title: data[i][2],
+      forWhom: data[i][3],
+      link: data[i][4],
+      description: data[i][5]
+    });
+  }
+  return entries.reverse();
 }
