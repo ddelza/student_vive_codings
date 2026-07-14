@@ -45,7 +45,7 @@ function doGet(e) {
 
   if (action === 'getContestEntries') {
     return ContentService
-      .createTextOutput(JSON.stringify(getContestEntries()))
+      .createTextOutput(JSON.stringify(getContestEntries(e.parameter.viewerName)))
       .setMimeType(ContentService.MimeType.JSON);
   }
 
@@ -92,6 +92,12 @@ function doPost(e) {
       result = verifyContestLogin(data);
     } else if (action === 'submitContestEntry') {
       result = submitContestEntry(data);
+    } else if (action === 'toggleContestLike') {
+      result = toggleContestLike(data);
+    } else if (action === 'addContestComment') {
+      result = addContestComment(data);
+    } else if (action === 'deleteContestComment') {
+      result = deleteContestComment(data);
     } else {
       result = { success: false, message: '알 수 없는 action: ' + action };
     }
@@ -688,9 +694,30 @@ function getContestEntrySheet_() {
   var sheet = ss.getSheetByName(CONTEST_ENTRY_SHEET_NAME);
   if (!sheet) {
     sheet = ss.insertSheet(CONTEST_ENTRY_SHEET_NAME);
-    sheet.appendRow(['학번', '이름', '작품명', 'for whom', '링크', '기능 설명']);
+    sheet.appendRow(['학번', '이름', '작품명', 'for whom', '링크', '기능 설명', '시상', 'entryId', '좋아요수', '반응기록JSON', '댓글JSON']);
   }
   return sheet;
+}
+
+function contestSafeJson_(str, fallback) {
+  try {
+    if (!str) return fallback;
+    return JSON.parse(str);
+  } catch (e) {
+    return fallback;
+  }
+}
+
+// 게시글 식별용 고유 ID로 H열(entryId)에서 행 번호를 찾음. 행 순서가 바뀌어도(정렬 등)
+// 안전하게 같은 게시글을 다시 찾을 수 있음
+function findContestEntryRow_(sheet, entryId) {
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 1) return -1;
+  var ids = sheet.getRange(1, 8, lastRow, 1).getValues();
+  for (var i = 0; i < ids.length; i++) {
+    if (String(ids[i][0]) === String(entryId)) return i + 1;
+  }
+  return -1;
 }
 
 function submitContestEntry(data) {
@@ -711,25 +738,53 @@ function submitContestEntry(data) {
 
   var sheet = getContestEntrySheet_();
   var nextRow = sheet.getLastRow() + 1;
+  var entryId = 'E' + new Date().getTime() + Math.floor(Math.random() * 1000);
   // 먼저 학번 칸을 비워서 행을 추가한 뒤, 그 칸만 텍스트 서식으로 고정하고 값을 다시 써서
   // "0000" 같은 학번이 appendRow 과정에서 숫자 0으로 변환되는 걸 확실히 막는다.
-  sheet.appendRow(['', studentName, title, forWhom, link, description]);
+  sheet.appendRow(['', studentName, title, forWhom, link, description, '', entryId, 0, '{}', '[]']);
   sheet.getRange(nextRow, 1).setNumberFormat('@').setValue(studentId);
 
   return { success: true };
 }
 
-// contest_gallery.html에서 호출: "대회출품" 탭 전체를 그 탭에 정렬된 순서 그대로 반환
-function getContestEntries() {
+// 1회성 유틸 — Apps Script 편집기에서 직접 실행할 것.
+// "대회출품" 탭에서 아직 entryId(H열)가 없는 기존 행들에 고유 ID와 좋아요/댓글 기본값을 채워준다.
+function backfillContestEntryIds() {
+  var sheet = getContestEntrySheet_();
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 1) return '채울 데이터가 없습니다.';
+
+  var data = sheet.getRange(1, 8, lastRow, 4).getValues(); // H~K
+  var filled = 0;
+  for (var i = 0; i < data.length; i++) {
+    if (!data[i][0]) {
+      var entryId = 'E' + new Date().getTime() + Math.floor(Math.random() * 1000) + '_' + i;
+      sheet.getRange(i + 1, 8, 1, 4).setValues([[entryId, 0, '{}', '[]']]);
+      filled++;
+    }
+  }
+  return '채운 행: ' + filled + '개';
+}
+
+// contest_gallery.html에서 호출: "대회출품" 탭 전체를 그 탭에 정렬된 순서 그대로 반환.
+// viewerName을 주면 내가 좋아요를 눌렀는지/내 댓글인지도 함께 계산해서 반환
+function getContestEntries(viewerName) {
   var sheet = getContestEntrySheet_();
   var lastRow = sheet.getLastRow();
   if (lastRow < 1) return [];
 
+  var myKey = String(viewerName || '').replace(/\s+/g, ''); // 이름만으로 식별(간단 방식)
+
   // 이 탭은 헤더 행 없이 1행부터 바로 데이터가 시작됨
-  var data = sheet.getRange(1, 1, lastRow, 7).getValues(); // A~G (G열: 시상)
+  var data = sheet.getRange(1, 1, lastRow, 11).getValues(); // A~K
   var entries = [];
   for (var i = 0; i < data.length; i++) {
     if (!data[i][1]) continue; // 이름이 없는 빈 행은 건너뜀
+    var reactions = contestSafeJson_(data[i][9], {});
+    var comments = contestSafeJson_(data[i][10], []).map(function (c) {
+      c.isMine = myKey && String(c.name || '').replace(/\s+/g, '') === myKey;
+      return c;
+    });
     entries.push({
       studentId: String(data[i][0] || ''),
       studentName: data[i][1],
@@ -737,10 +792,108 @@ function getContestEntries() {
       forWhom: data[i][3],
       link: data[i][4],
       description: data[i][5],
-      award: data[i][6] || ''
+      award: data[i][6] || '',
+      entryId: data[i][7] || '',
+      likeCount: Number(data[i][8]) || 0,
+      myLiked: !!(myKey && reactions[myKey]),
+      comments: comments
     });
   }
   return entries; // "대회출품" 탭에서 직접 정렬해둔 순서를 그대로 유지 (뒤집지 않음)
+}
+
+// 좋아요 토글 — 로그인 시스템이 따로 없는 공개 갤러리라 "이름"만으로 간단히 식별(중복 방지)
+function toggleContestLike(data) {
+  var name = String(data.name || '').trim();
+  var entryId = String(data.entryId || '').trim();
+  if (!name) return { success: false, message: '이름을 입력해주세요.' };
+  if (!entryId) return { success: false, message: '게시물을 찾을 수 없습니다.' };
+
+  var sheet = getContestEntrySheet_();
+  var rowNum = findContestEntryRow_(sheet, entryId);
+  if (rowNum === -1) return { success: false, message: '게시물을 찾을 수 없습니다.' };
+
+  var row = sheet.getRange(rowNum, 9, 1, 2).getValues()[0]; // I(좋아요수), J(반응JSON)
+  var likeCount = Number(row[0]) || 0;
+  var reactions = contestSafeJson_(row[1], {});
+  var key = name.replace(/\s+/g, '');
+
+  var liked = !!reactions[key];
+  if (liked) {
+    delete reactions[key];
+    likeCount--;
+  } else {
+    reactions[key] = true;
+    likeCount++;
+  }
+  likeCount = Math.max(0, likeCount);
+
+  sheet.getRange(rowNum, 9, 1, 2).setValues([[likeCount, JSON.stringify(reactions)]]);
+  return { success: true, likeCount: likeCount, myLiked: !liked };
+}
+
+// 댓글/대댓글 추가
+function addContestComment(data) {
+  var name = String(data.name || '').trim();
+  var text = String(data.text || '').trim();
+  var entryId = String(data.entryId || '').trim();
+  if (!name) return { success: false, message: '이름을 입력해주세요.' };
+  if (!text) return { success: false, message: '댓글 내용을 입력해주세요.' };
+  if (!entryId) return { success: false, message: '게시물을 찾을 수 없습니다.' };
+
+  var sheet = getContestEntrySheet_();
+  var rowNum = findContestEntryRow_(sheet, entryId);
+  if (rowNum === -1) return { success: false, message: '게시물을 찾을 수 없습니다.' };
+
+  var comments = contestSafeJson_(sheet.getRange(rowNum, 11).getValue(), []);
+  var comment = {
+    id: 'C' + new Date().getTime() + Math.floor(Math.random() * 1000),
+    parentId: data.parentId || null,
+    name: name,
+    text: text,
+    time: Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm')
+  };
+  comments.push(comment);
+  sheet.getRange(rowNum, 11).setValue(JSON.stringify(comments));
+
+  var myKey = name.replace(/\s+/g, '');
+  var result = comments.map(function (c) {
+    return { id: c.id, parentId: c.parentId, name: c.name, text: c.text, time: c.time, isMine: String(c.name).replace(/\s+/g, '') === myKey };
+  });
+  return { success: true, comments: result };
+}
+
+// 본인(이름 기준) 댓글/대댓글 삭제 — 대댓글이 달린 댓글을 지우면 대댓글도 함께 삭제
+function deleteContestComment(data) {
+  var name = String(data.name || '').trim();
+  var entryId = String(data.entryId || '').trim();
+  if (!name) return { success: false, message: '이름을 입력해주세요.' };
+
+  var sheet = getContestEntrySheet_();
+  var rowNum = findContestEntryRow_(sheet, entryId);
+  if (rowNum === -1) return { success: false, message: '게시물을 찾을 수 없습니다.' };
+
+  var comments = contestSafeJson_(sheet.getRange(rowNum, 11).getValue(), []);
+  var target = null;
+  for (var i = 0; i < comments.length; i++) {
+    if (comments[i].id === data.commentId) { target = comments[i]; break; }
+  }
+  if (!target) return { success: false, message: '댓글을 찾을 수 없습니다.' };
+  if (String(target.name).replace(/\s+/g, '') !== name.replace(/\s+/g, '')) {
+    return { success: false, message: '본인이 작성한 댓글만 삭제할 수 있습니다.' };
+  }
+
+  comments = comments.filter(function (c) {
+    return c.id !== data.commentId && c.parentId !== data.commentId;
+  });
+
+  sheet.getRange(rowNum, 11).setValue(JSON.stringify(comments));
+
+  var myKey = name.replace(/\s+/g, '');
+  var result = comments.map(function (c) {
+    return { id: c.id, parentId: c.parentId, name: c.name, text: c.text, time: c.time, isMine: String(c.name).replace(/\s+/g, '') === myKey };
+  });
+  return { success: true, comments: result };
 }
 
 // 1회성 유틸 — Apps Script 편집기에서 직접 실행할 것.
@@ -753,7 +906,9 @@ function sortContestEntriesByAward() {
   var lastRow = sheet.getLastRow();
   if (lastRow < 1) return '정렬할 데이터가 없습니다.';
 
-  var range = sheet.getRange(1, 1, lastRow, 7); // A~G
+  // A~K (H~K: entryId/좋아요수/반응JSON/댓글JSON도 반드시 같이 옮겨야 정렬 후에도
+  // 좋아요·댓글이 엉뚱한 행에 붙는 사고가 안 남)
+  var range = sheet.getRange(1, 1, lastRow, 11);
   var data = range.getValues();
 
   // 원래 행 순서를 안정 정렬의 기준(tie-breaker)으로 사용
