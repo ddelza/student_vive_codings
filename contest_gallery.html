@@ -96,6 +96,7 @@
   .comment-input-row { display: flex; gap: 6px; margin-top: 6px; }
   .comment-input-row.reply-input { margin-left: 18px; }
   .comment-input-row input { flex: 1; padding: 7px 9px; border: 1px solid #e2e6f0; border-radius: 7px; font-size: 12.5px; box-sizing: border-box; }
+  .comment-input-row input.name-input { flex: 0 0 78px; }
   .comment-input-row button { padding: 7px 11px; border: none; border-radius: 7px; background: #2d6cdf; color: #fff; font-size: 12.5px; cursor: pointer; }
   .no-comments { font-size: 12px; color: #7f8c8d; }
 </style>
@@ -189,7 +190,9 @@ function renderCommentActions(entryId, c) {
 
 function renderReplyBox(entryId, parentId) {
   if (!expandedReplyFor[parentId]) return '';
+  var savedName = escapeHtml(localStorage.getItem('contest_gallery_name') || '');
   return '<div class="comment-input-row reply-input">' +
+    '<input type="text" class="name-input" id="reply-name-' + parentId + '" placeholder="이름" value="' + savedName + '">' +
     '<input type="text" id="reply-input-' + parentId + '" placeholder="답글을 남겨보세요" onkeydown="if(event.key===\'Enter\')submitReply(\'' + entryId + '\',\'' + parentId + '\')">' +
     '<button onclick="submitReply(\'' + entryId + '\',\'' + parentId + '\')">등록</button>' +
   '</div>';
@@ -228,6 +231,7 @@ function renderCard(entry, i) {
     commentsHtml = '<div class="comment-box">' +
       renderComments(entry) +
       '<div class="comment-input-row">' +
+        '<input type="text" class="name-input" id="comment-name-' + eid + '" placeholder="이름" value="' + escapeHtml(localStorage.getItem('contest_gallery_name') || '') + '">' +
         '<input type="text" id="comment-input-' + eid + '" placeholder="댓글을 남겨보세요" onkeydown="if(event.key===\'Enter\')submitComment(\'' + eid + '\')">' +
         '<button onclick="submitComment(\'' + eid + '\')">등록</button>' +
       '</div>' +
@@ -288,8 +292,10 @@ function submitComment(entryId) {
   var input = document.getElementById('comment-input-' + entryId);
   var text = input.value.trim();
   if (!text) return;
-  var name = getViewerName();
-  if (!name) return;
+  var nameInput = document.getElementById('comment-name-' + entryId);
+  var name = nameInput.value.trim();
+  if (!name) { alert('이름을 입력해주세요.'); return; }
+  localStorage.setItem('contest_gallery_name', name);
   fetch(APP_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'text/plain;charset=utf-8' },
@@ -314,8 +320,10 @@ function submitReply(entryId, parentId) {
   var input = document.getElementById('reply-input-' + parentId);
   var text = input.value.trim();
   if (!text) return;
-  var name = getViewerName();
-  if (!name) return;
+  var nameInput = document.getElementById('reply-name-' + parentId);
+  var name = nameInput.value.trim();
+  if (!name) { alert('이름을 입력해주세요.'); return; }
+  localStorage.setItem('contest_gallery_name', name);
   fetch(APP_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'text/plain;charset=utf-8' },
