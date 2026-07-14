@@ -57,6 +57,15 @@
   .award-gold { background: linear-gradient(135deg,#fff2b8,#ffd24d); color: #6b4c00; }
   .award-silver { background: linear-gradient(135deg,#f2f2f2,#c7c7c7); color: #444; }
   .award-bronze { background: linear-gradient(135deg,#eac199,#c98a4b); color: #4a2c00; }
+
+  .card-details { position: relative; max-height: 230px; overflow: hidden; }
+  .card-details.expanded { max-height: none; }
+  .card-details.has-fade::after {
+    content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 36px;
+    background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,1));
+  }
+  .card-details.expanded.has-fade::after { display: none; }
+  .more-toggle { color: #2d6cdf; font-size: 12.5px; font-weight: bold; cursor: pointer; margin-top: 8px; display: none; }
 </style>
 </head>
 <body>
@@ -110,7 +119,7 @@ function awardBadge(award) {
   return '';
 }
 
-function renderCard(entry) {
+function renderCard(entry, i) {
   var linkHtml = entry.link
     ? '<a class="link-btn" href="' + escapeHtml(entry.link) + '" target="_blank" rel="noopener">🔗 작품 열어보기</a>'
     : '<div class="no-link">아직 링크 없음 (아이디어 단계)</div>';
@@ -119,12 +128,36 @@ function renderCard(entry) {
     awardBadge(entry.award) +
     '<div class="title">' + escapeHtml(entry.title) + '</div>' +
     '<div class="author">' + escapeHtml(entry.studentName) + ' (' + escapeHtml(entry.studentId) + ')</div>' +
-    '<div class="label">누구를 위한 앱인가요?</div>' +
-    '<div class="text">' + escapeHtml(entry.forWhom) + '</div>' +
-    '<div class="label">기능 설명</div>' +
-    '<div class="text">' + escapeHtml(entry.description) + '</div>' +
+    '<div class="card-details" id="details-' + i + '">' +
+      '<div class="label">누구를 위한 앱인가요?</div>' +
+      '<div class="text">' + escapeHtml(entry.forWhom) + '</div>' +
+      '<div class="label">기능 설명</div>' +
+      '<div class="text">' + escapeHtml(entry.description) + '</div>' +
+    '</div>' +
+    '<div class="more-toggle" id="toggle-' + i + '" onclick="toggleMore(' + i + ')">···더보기 ▾</div>' +
     linkHtml +
   '</div>';
+}
+
+// 카드 내용이 접힌 상태의 높이(약 10줄 분량)보다 실제로 더 긴 경우에만
+// 더보기 버튼을 보여준다 (유튜브 댓글처럼)
+function applyOverflowToggles(count) {
+  for (var i = 0; i < count; i++) {
+    var details = document.getElementById('details-' + i);
+    var toggle = document.getElementById('toggle-' + i);
+    if (!details || !toggle) continue;
+    if (details.scrollHeight > details.clientHeight + 4) {
+      details.classList.add('has-fade');
+      toggle.style.display = 'inline-block';
+    }
+  }
+}
+
+function toggleMore(i) {
+  var details = document.getElementById('details-' + i);
+  var toggle = document.getElementById('toggle-' + i);
+  var expanded = details.classList.toggle('expanded');
+  toggle.textContent = expanded ? '접기 ▲' : '···더보기 ▾';
 }
 
 function renderGallery(entries) {
@@ -134,6 +167,7 @@ function renderGallery(entries) {
     return;
   }
   gallery.innerHTML = entries.map(renderCard).join('');
+  applyOverflowToggles(entries.length);
 }
 
 function filterEntries() {
