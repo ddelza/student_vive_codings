@@ -719,7 +719,7 @@ function submitContestEntry(data) {
   return { success: true };
 }
 
-// contest_gallery.html에서 호출: "대회출품" 탭 전체를 읽어서 최신 제출이 먼저 오도록 뒤집어 반환
+// contest_gallery.html에서 호출: "대회출품" 탭 전체를 그 탭에 정렬된 순서 그대로 반환
 function getContestEntries() {
   var sheet = getContestEntrySheet_();
   var lastRow = sheet.getLastRow();
@@ -739,5 +739,5 @@ function getContestEntries() {
       description: data[i][5]
     });
   }
-  return entries.reverse();
+  return entries; // "대회출품" 탭에서 직접 정렬해둔 순서를 그대로 유지 (뒤집지 않음)
 }
