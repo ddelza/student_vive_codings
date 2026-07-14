@@ -1,0 +1,1055 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>학생의 모든 것 (All in One)</title>
+    <!-- Tailwind CSS 탑재 -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', 'Noto Sans KR', sans-serif;
+            background-color: #f3f4f6;
+            -webkit-tap-highlight-color: transparent;
+        }
+        /* 스크롤바 숨기기 */
+        ::-webkit-scrollbar {
+            display: none;
+        }
+    </style>
+</head>
+<body class="flex justify-center items-start min-h-screen pb-20">
+
+<div id="app" class="w-full max-w-[480px] min-h-screen bg-slate-50 flex flex-col shadow-2xl relative border-x border-slate-200">
+    <!-- 상단 고정 헤더 -->
+    <header class="bg-white sticky top-0 z-50 px-4 py-3 border-b border-slate-100 shadow-sm flex flex-col gap-2">
+        <div class="flex justify-between items-center">
+            <h1 id="header-title" class="text-xl font-extrabold text-indigo-600 tracking-tight flex items-center gap-1">
+                <span>📅</span> 학교 시간표
+            </h1>
+            <span id="current-live-date" class="text-xs font-bold bg-indigo-50 text-indigo-600 px-2.5 py-1 rounded-full"></span>
+        </div>
+        <!-- 힐링 명언 미니 배너 -->
+        <div class="bg-gradient-to-r from-violet-50 to-indigo-50 p-2.5 rounded-xl border border-indigo-100 flex items-start gap-2 relative overflow-hidden">
+            <span class="text-indigo-400 text-lg leading-none font-serif">"</span>
+            <div class="flex-1">
+                <p id="top-quote-text" class="text-xs font-bold text-slate-700 leading-relaxed break-keep">행동은 모든 성공의 가장 기초적인 핵심이다.</p>
+                <p id="top-quote-author" class="text-[10px] text-indigo-500 font-medium mt-0.5">- 파블로 피카소</p>
+            </div>
+            <button onclick="getNewQuote()" class="text-xs text-indigo-400 hover:text-indigo-600 font-bold self-center p-1 bg-white rounded-md shadow-xs ml-1">🔄</button>
+        </div>
+    </header>
+
+    <!-- 메인 콘텐츠 영역 -->
+    <main class="flex-1 p-4 overflow-y-auto">
+
+        <!-- 1. 시간표 탭 -->
+        <div id="tab-timetable" class="tab-content block">
+            <div class="flex gap-2 mb-3">
+                <select id="select-grade" class="flex-1 bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-bold text-slate-700 shadow-xs focus:outline-none focus:border-indigo-500 transition-colors">
+                    <option value="1">1학년</option>
+                    <option value="2">2학년</option>
+                    <option value="3">3학년</option>
+                </select>
+                <select id="select-class" class="flex-1 bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-bold text-slate-700 shadow-xs focus:outline-none focus:border-indigo-500 transition-colors">
+                    <!-- 학년별로 동적으로 들어감 -->
+                </select>
+            </div>
+
+            <div class="flex bg-slate-200/60 p-1 rounded-xl mb-3">
+                <button class="week-btn flex-1 py-2 text-xs font-bold text-slate-600 rounded-lg transition-all" id="btn-this-week" onclick="switchWeek(0)">이번 주</button>
+                <button class="week-btn flex-1 py-2 text-xs font-bold text-slate-600 rounded-lg transition-all" id="btn-next-week" onclick="switchWeek(1)">다음 주</button>
+            </div>
+
+            <div class="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm">
+                <!-- 로딩 영역 -->
+                <div id="timetable-loading" class="flex flex-col items-center justify-center py-10 gap-3">
+                    <div class="w-8 h-8 border-4 border-indigo-100 border-t-indigo-600 rounded-full animate-spin"></div>
+                    <p class="text-xs font-semibold text-slate-400">학급 시간표 데이터를 불러오는 중...</p>
+                </div>
+                <div id="timetable-error" class="hidden text-center text-red-500 py-10 font-medium">시간표 정보를 조회할 수 없습니다.</div>
+
+                <!-- 실제 테이블 -->
+                <div id="timetable-view" class="hidden overflow-x-auto rounded-xl border border-slate-100">
+                    <div id="grid-body" class="grid grid-cols-6 min-width-[330px] bg-slate-100 gap-[1px]">
+                        <!-- JS에서 동적 시간표 삽입 -->
+                    </div>
+                </div>
+                <div id="sync-time-display" class="text-center text-[10px] text-slate-400 mt-3 font-semibold"></div>
+            </div>
+        </div>
+
+        <!-- 2. 급식 알리미 탭 -->
+        <div id="tab-meal" class="tab-content hidden">
+            <div class="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm flex flex-col gap-4">
+                <div class="flex items-center justify-between">
+                    <span class="text-base font-extrabold text-slate-800 flex items-center gap-1.5">🍲 오늘 식단알리미</span>
+                    <input type="date" id="meal-date-picker" class="border border-slate-200 rounded-lg px-2 py-1 text-xs font-bold text-slate-700 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-indigo-400" onchange="onMealDateChanged(this.value)">
+                </div>
+
+                <!-- 날짜 변경기 -->
+                <div class="flex justify-between items-center bg-indigo-50/50 p-2.5 rounded-xl border border-indigo-100">
+                    <button onclick="changeMealDate(-1)" class="px-3 py-1.5 bg-white border border-indigo-100 text-indigo-600 hover:bg-indigo-50 font-bold text-xs rounded-lg shadow-2xs">◀ 이전날</button>
+                    <span id="meal-active-date" class="text-sm font-extrabold text-slate-800">2026년 07월 08일 (수)</span>
+                    <button onclick="changeMealDate(1)" class="px-3 py-1.5 bg-white border border-indigo-100 text-indigo-600 hover:bg-indigo-50 font-bold text-xs rounded-lg shadow-2xs">다음날 ▶</button>
+                </div>
+
+                <!-- 급식 메인 보드 -->
+                <div id="meal-loading" class="flex flex-col items-center justify-center py-10 gap-3 hidden">
+                    <div class="w-8 h-8 border-4 border-indigo-100 border-t-indigo-600 rounded-full animate-spin"></div>
+                    <p class="text-xs font-semibold text-slate-400">급식 데이터를 실시간 조회하는 중...</p>
+                </div>
+                <div id="meal-container" class="relative bg-slate-50 border border-slate-200/50 p-5 rounded-2xl min-h-[160px] flex flex-col justify-center items-center">
+                    <div id="meal-menu-content" class="text-slate-800 text-base font-bold text-center leading-loose whitespace-pre-line break-keep"></div>
+                    <div id="meal-calorie-badge" class="mt-4 inline-block bg-emerald-50 text-emerald-600 border border-emerald-100 px-3 py-1 rounded-full text-xs font-bold shadow-xs"></div>
+                </div>
+
+                <div class="flex gap-2">
+                    <button class="flex-1 py-2.5 bg-indigo-600 active:bg-indigo-700 text-white font-extrabold text-xs rounded-xl shadow-md tracking-wider transition-colors" onclick="setMealToToday()">🏠 오늘 급식 바로가기</button>
+                    <button class="px-4 py-2.5 bg-slate-100 text-slate-700 font-bold text-xs rounded-xl hover:bg-slate-200 transition-colors" onclick="fetchMealData()">🔄 새로고침</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 3. 공부 타이머 탭 -->
+        <div id="tab-timer" class="tab-content hidden">
+            <div class="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm flex flex-col gap-4 mb-4">
+                <div class="flex justify-between items-center">
+                    <span class="text-base font-extrabold text-slate-800 flex items-center gap-1.5">⏱️ 공부 타이머</span>
+                    <button onclick="openTimerModal()" class="bg-indigo-600 text-white px-3 py-1.5 rounded-xl font-extrabold text-xs flex items-center gap-1 hover:bg-indigo-700 shadow-md">
+                        <span>➕</span> 과목 추가
+                    </button>
+                </div>
+
+                <!-- 총 공부 시간 요약 카드 -->
+                <div class="bg-slate-900 text-white p-4 rounded-2xl flex justify-between items-center shadow-lg relative overflow-hidden">
+                    <div>
+                        <p class="text-[11px] font-bold text-slate-400 tracking-wider">TODAY TOTAL STUDYTIME</p>
+                        <h3 id="timer-total-display" class="text-2xl font-black mt-1 font-mono text-emerald-400">00:00:00</h3>
+                    </div>
+                    <div class="text-4xl">🔥</div>
+                </div>
+
+                <!-- 타이머 과목 목록 리스트 -->
+                <div id="timer-list" class="flex flex-col gap-3">
+                    <!-- JS에서 동적 렌더링 -->
+                </div>
+            </div>
+        </div>
+
+        <!-- 4. 메모장 탭 -->
+        <div id="tab-memo" class="tab-content hidden">
+            <div class="flex flex-col gap-4">
+                <!-- 파일/폴더 관리 헤더 -->
+                <div class="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm flex flex-col gap-3">
+                    <div class="flex justify-between items-center">
+                        <span class="text-base font-extrabold text-slate-800 flex items-center gap-1.5">📁 메모장 폴더</span>
+                        <button onclick="openFileCreateModal()" class="bg-indigo-600 text-white px-3 py-1.5 rounded-xl font-extrabold text-xs flex items-center gap-1 hover:bg-indigo-700 shadow-sm">
+                            <span>➕</span> 파일 만들기
+                        </button>
+                    </div>
+
+                    <!-- 파일 목록 슬롯 -->
+                    <div id="memo-file-list" class="grid grid-cols-2 gap-2.5">
+                        <!-- JS 동적 렌더링 -->
+                    </div>
+                </div>
+
+                <!-- 선택된 파일 내부의 메모 목록 보드 -->
+                <div id="memo-inside-panel" class="hidden bg-white rounded-2xl p-4 border border-slate-100 shadow-sm flex flex-col gap-3">
+                    <div class="flex justify-between items-center border-b border-slate-100 pb-3">
+                        <button onclick="exitFolderView()" class="text-xs font-extrabold text-indigo-600 flex items-center gap-1 hover:underline">
+                            <span>◀</span> 폴더목록
+                        </button>
+                        <h4 id="active-file-title" class="text-sm font-black text-slate-800 truncate max-w-[150px]">수학 오답노트</h4>
+                        <button onclick="openMemoAddModal()" class="bg-indigo-50 text-indigo-600 hover:bg-indigo-100 px-2.5 py-1.5 rounded-lg font-extrabold text-xs">
+                            📝 메모추가
+                        </button>
+                    </div>
+
+                    <div id="memos-container" class="flex flex-col gap-3.5 mt-2">
+                        <!-- JS 동적 메모 카드 렌더링 -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 5. 생활교통 탭 -->
+        <div id="tab-life" class="tab-content hidden">
+            <!-- 날씨 카드 -->
+            <div class="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm mb-4">
+                <div class="card-title text-base font-extrabold text-slate-800">⛅ 퇴촌면 주간 날씨 예보</div>
+                <!-- 안전한 Tailwind 구성의 로더 -->
+                <div id="weather-loading" class="flex flex-col items-center justify-center py-10 gap-3">
+                    <div class="w-8 h-8 border-4 border-indigo-100 border-t-indigo-600 rounded-full animate-spin"></div>
+                    <p class="text-xs font-semibold text-slate-400">날씨 예보를 불러오는 중...</p>
+                </div>
+                <div id="weather-container" class="hidden">
+                    <div class="weather-today text-center py-4 border-b border-slate-100">
+                        <p class="text-xs font-bold text-slate-400">현재 퇴촌면 기온</p>
+                        <div class="temp text-4xl font-extrabold text-indigo-600 my-1" id="today-temp">24°C</div>
+                        <p id="today-desc" class="text-xs font-extrabold text-slate-700">맑음</p>
+                    </div>
+                    <div id="weather-week-list" class="divide-y divide-slate-100"></div>
+                </div>
+            </div>
+
+            <!-- 교통 카드 -->
+            <div class="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm">
+                <div class="card-title text-base font-extrabold text-slate-800">🚌 학교 앞 버스/지하철 정보</div>
+                <div class="space-y-3 mt-3">
+                    <div class="transport-item bg-slate-50 border border-slate-100 p-3.5 rounded-xl">
+                        <div class="route-header flex justify-between items-center mb-1">
+                            <span class="route-name bus-green bg-emerald-500 text-white font-extrabold px-2 py-0.5 rounded-md text-[10px]">13-2번 (경기버스)</span>
+                            <span class="arrival-info text-xs font-bold text-amber-500">3분 40초 후 도착</span>
+                        </div>
+                        <p class="text-[10px] text-slate-400 font-semibold">[광수중학교.퇴촌면사무소 정류장]</p>
+                    </div>
+                    <div class="transport-item bg-slate-50 border border-slate-100 p-3.5 rounded-xl">
+                        <div class="route-header flex justify-between items-center mb-1">
+                            <span class="route-name bus-red bg-rose-500 text-white font-extrabold px-2 py-0.5 rounded-md text-[10px]">G3800번 (직행좌석)</span>
+                            <span class="arrival-info text-xs font-bold text-amber-500">12분 후 도착</span>
+                        </div>
+                        <p class="text-[10px] text-slate-400 font-semibold">[퇴촌사거리 정류장]</p>
+                    </div>
+                    <div class="transport-item bg-slate-50 border border-slate-100 p-3.5 rounded-xl">
+                        <div class="route-header flex justify-between items-center mb-1">
+                            <span class="route-name subway-line bg-blue-500 text-white font-extrabold px-2 py-0.5 rounded-md text-[10px]">경강선 (경기광주역)</span>
+                            <span class="arrival-info text-xs font-bold text-amber-500">판교행 6분 후 도착</span>
+                        </div>
+                        <p class="text-[10px] text-slate-400 font-semibold">[여주선 역사 전광판 실시간 연동]</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- 1. 타이머 과목 추가 모달 -->
+    <div id="modal-timer-add" class="fixed inset-0 bg-slate-900/60 flex items-center justify-center z-100 hidden p-4">
+        <div class="bg-white w-full max-w-[350px] rounded-2xl p-5 shadow-2xl flex flex-col gap-4">
+            <h3 class="text-sm font-black text-slate-800">⏱️ 타이머 과목 추가</h3>
+            <input type="text" id="input-timer-subject" placeholder="과목 또는 공부 내용 입력" class="border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-indigo-400">
+            <div class="flex gap-2">
+                <button onclick="closeTimerModal()" class="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl">취소</button>
+                <button onclick="addTimerSubject()" class="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs rounded-xl">만들기</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. 메모장 파일 생성 모달 -->
+    <div id="modal-file-create" class="fixed inset-0 bg-slate-900/60 flex items-center justify-center z-100 hidden p-4">
+        <div class="bg-white w-full max-w-[350px] rounded-2xl p-5 shadow-2xl flex flex-col gap-4">
+            <h3 class="text-sm font-black text-slate-800">📁 새로운 메모 파일</h3>
+            <input type="text" id="input-file-name" placeholder="파일 이름 (예: 수학오답, 독서일기)" class="border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-indigo-400">
+            <div class="flex gap-2">
+                <button onclick="closeFileCreateModal()" class="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl">취소</button>
+                <button onclick="createMemoFile()" class="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs rounded-xl">생성</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 3. 메모장 본문 추가/수정 모달 -->
+    <div id="modal-memo-add" class="fixed inset-0 bg-slate-900/60 flex items-center justify-center z-100 hidden p-4">
+        <div class="bg-white w-full max-w-[380px] rounded-2xl p-5 shadow-2xl flex flex-col gap-4">
+            <h3 id="memo-modal-title" class="text-sm font-black text-slate-800">📝 메모 기록하기</h3>
+            <textarea id="textarea-memo-content" rows="6" placeholder="자유롭게 기록해 보세요... 글자수 제한이 없습니다." class="border border-slate-200 rounded-xl p-3 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-indigo-400 leading-relaxed"></textarea>
+            <div class="flex gap-2">
+                <button onclick="closeMemoAddModal()" class="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl">취소</button>
+                <button id="btn-memo-save" class="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs rounded-xl">저장하기</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 4. [보안 승인된 핵심 개선] 커스텀 알림/확인 모달 (alert/confirm 대체) -->
+    <div id="custom-alert-modal" class="fixed inset-0 bg-slate-900/60 flex items-center justify-center z-[200] hidden p-4">
+        <div class="bg-white w-full max-w-[350px] rounded-2xl p-5 shadow-2xl flex flex-col gap-4 transform scale-95 transition-all duration-200">
+            <div class="flex items-start gap-3">
+                <span id="custom-modal-icon" class="text-2xl">⚠️</span>
+                <div class="flex-1">
+                    <h3 id="custom-modal-title" class="text-sm font-black text-slate-800">알림</h3>
+                    <p id="custom-modal-message" class="text-xs text-slate-500 font-semibold mt-1 leading-relaxed break-keep"></p>
+                </div>
+            </div>
+            <div class="flex gap-2 justify-end mt-2" id="custom-modal-buttons">
+                <!-- 버튼들이 동적으로 채워짐 -->
+            </div>
+        </div>
+    </div>
+
+    <!-- 하단 내비게이션 바 (5-탭 시스템) -->
+    <nav class="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[480px] bg-white border-t border-slate-200 flex h-16 z-50 shadow-lg">
+        <div class="nav-item flex-1 flex flex-col items-center justify-center cursor-pointer gap-0.5 text-slate-400 active-tab text-indigo-600" onclick="switchTab('timetable', '📅 학교 시간표', this)">
+            <span class="text-lg">📅</span><span class="text-[9px] font-bold">시간표</span>
+        </div>
+        <div class="nav-item flex-1 flex flex-col items-center justify-center cursor-pointer gap-0.5 text-slate-400" onclick="switchTab('meal', '🍲 급식 알리미', this)">
+            <span class="text-lg">🍲</span><span class="text-[9px] font-bold">급식</span>
+        </div>
+        <div class="nav-item flex-1 flex flex-col items-center justify-center cursor-pointer gap-0.5 text-slate-400" onclick="switchTab('timer', '⏱️ 공부 타이머', this)">
+            <span class="text-lg">⏱️</span><span class="text-[9px] font-bold">타이머</span>
+        </div>
+        <div class="nav-item flex-1 flex flex-col items-center justify-center cursor-pointer gap-0.5 text-slate-400" onclick="switchTab('memo', '📝 비밀 메모장', this)">
+            <span class="text-lg">📝</span><span class="text-[9px] font-bold">메모장</span>
+        </div>
+        <div class="nav-item flex-1 flex flex-col items-center justify-center cursor-pointer gap-0.5 text-slate-400" onclick="switchTab('life', '⚙️ 생활 교통', this)">
+            <span class="text-lg">⚙️</span><span class="text-[9px] font-bold">생활교통</span>
+        </div>
+    </nav>
+</div>
+
+<script>
+    let timetableData = null;
+    let currentWeekIdx = 0;
+    const WEEKDAYS = ['월', '화', '수', '목', '금'];
+    const MAX_PERIOD = 7;
+
+    // 7월 광수중학교 공식 홈페이지 등록 식단 데이터베이스 (하이브리드 백업용)
+    const gwangsuMealDatabase = {
+        "20260629": "귀리밥\n감자탕\n청포묵김가루무침\n생선커틀렛 (타르타르소스)\n배추김치\n과일푸딩",
+        "20260630": "단호박치킨카레밥\n분짜 (샐러드/소스/면)\n분짜 (간장양념고기)\n진미채도라지볶음\n배추김치\n레몬슬러시",
+        "20260701": "계란버터장조림덮밥\n콩나물국\n오이지매실무침\n우리밀핫도그 & 케첩\n깍두기\n패션후르츠주스",
+        "20260702": "찹쌀밥\n전복미역국\n쫄면채소무침\n돼지고기간장불고기\n배추김치\n크레이프케이크",
+        "20260703": "칼슘혼합잡곡밥\n감자수제비국\n돈육김치찜\n취나물버섯볶음\n하트햄계란부침\n청포도",
+        "20260706": "흑미차조밥\n떡만두국\n알감자약고추장조림\n육전 & 영양부추무침\n배추김치\n파인애플",
+        "20260707": "칼슘보리밥\n짬뽕순두부찌개\n숙주미나리무침\n고추바사삭닭봉구이\n배추김치\n요구르트(80ml)",
+        "20260708": "스파게티\n케이준치킨샐러드\n조각피자\n깍두기\n오이피클\n요거트푸딩",
+        "20260709": "칼슘기장밥\n쇠고기낙지샤브\n머위대들깨볶음\n데리야끼연어구이\n배추김치\n아이스슈",
+        "20260710": "귀리밥\n마라탕\n비엔나야채볶음\n오꼬노미야끼\n배추김치\n토마토치즈샐러드",
+        "20260713": "곤드레밥\n팽이버섯된장국\n동그랑땡부침\n도라지초무침\n배추김치\n수박",
+        "20260714": "현미찹쌀밥\n순두부찌개\n치즈불닭\n감자채볶음\n깍두기\n바나나",
+        "20260715": "수제돈까스 & 브라운소스\n크림스프\n추억의양배추샐러드\n오이지무침\n배추김치\n블루베리에이드",
+        "20260716": "기장밥\n맑은쇠고기무국\n안동찜닭\n두부양념조림\n배추김치\n방울토마토",
+        "20260717": "짜장밥\n짬뽕국\n탕수육 & 소스\n단무지무침\n배추김치\n망고푸딩",
+        "20260720": "보리밥\n부대찌개\n삼겹살오븐구이\n파채무침\n깍두기\n골드키위",
+        "20260721": "비빔밥 & 약고추장\n유부장국\n새우튀김\n열무김치\n꿀떡",
+        "20260722": "잔치국수\n치킨텐더샐러드\n찐만두\n겉절이김치\n아이스초코",
+        "20260723": "쌀밥\n닭개장\n갈치구이\n애호박버섯볶음\n배추김치\n참외",
+        "20260724": "날치알김치볶음밥\n어묵국\n허니버터소시지\n양상추샐러드\n깍두기\n오렌지"
+    };
+
+    // 명언 힐링 DB
+    const quotes = [
+        { text: "행동은 모든 성공의 가장 기초적인 핵심이다.", author: "파블로 피카소" },
+        { text: "천재는 1%의 영감과 99%의 땀으로 이루어진다.", author: "토마스 에디슨" },
+        { text: "할 수 있다고 믿는 사람은 결국 그렇게 되고, 믿지 않는 사람은 그렇게 안된다.", author: "노먼 빈센트 필" },
+        { text: "가장 어두운 밤도 언젠가는 끝나고 해는 떠오를 것이다.", author: "빅토르 위고" },
+        { text: "아무것도 하지 않으면 아무 일도 일어나지 않는다.", author: "기시미 이치로" },
+        { text: "성공은 최종적인 것이 아니며 실패는 치명적인 것이 아니다.", author: "윈스턴 처칠" }
+    ];
+
+    // 급식 일자 관리 상태값 (초기값 오늘)
+    let mealActiveDateObj = new Date();
+
+    // 타이머 데이터 상태값
+    let timerSubjects = [];
+    let activeTimerId = null;
+    let timerInterval = null;
+
+    // 메모장 데이터 상태값
+    let memoFiles = [];
+    let activeFileId = null;
+    let editingMemoId = null;
+
+    window.addEventListener('DOMContentLoaded', () => {
+        showLiveHeaderDate();
+        initTimetableEvents();
+        updateClassOptions();
+        fetchTimetable();
+        setMealToToday();
+        fetchWeatherData();
+        getNewQuote();
+
+        // 로컬 스토리지 복구 호출
+        loadTimerData();
+        loadMemoData();
+    });
+
+    // 헤더 현재 날짜 표시
+    function showLiveHeaderDate() {
+        const today = new Date();
+        const y = today.getFullYear();
+        const m = String(today.getMonth() + 1).padStart(2, '0');
+        const d = String(today.getDate()).padStart(2, '0');
+        const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
+        document.getElementById('current-live-date').innerText = `${m}/${d} (${dayNames[today.getDay()]})`;
+    }
+
+    // [보안 지침 준수] 커스텀 알림/확인 다이얼로그 시스템 구현
+    function showCustomAlert(message, title = '알림', icon = '💡') {
+        const modal = document.getElementById('custom-alert-modal');
+        document.getElementById('custom-modal-title').innerText = title;
+        document.getElementById('custom-modal-message').innerText = message;
+        document.getElementById('custom-modal-icon').innerText = icon;
+
+        const btnContainer = document.getElementById('custom-modal-buttons');
+        btnContainer.innerHTML = '';
+
+        const okBtn = document.createElement('button');
+        okBtn.className = "px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs rounded-xl shadow-md min-w-[70px]";
+        okBtn.innerText = "확인";
+        okBtn.onclick = () => {
+            modal.classList.add('hidden');
+        };
+
+        btnContainer.appendChild(okBtn);
+        modal.classList.remove('hidden');
+    }
+
+    function showCustomConfirm(message, onConfirm, title = '확인', icon = '❓') {
+        const modal = document.getElementById('custom-alert-modal');
+        document.getElementById('custom-modal-title').innerText = title;
+        document.getElementById('custom-modal-message').innerText = message;
+        document.getElementById('custom-modal-icon').innerText = icon;
+
+        const btnContainer = document.getElementById('custom-modal-buttons');
+        btnContainer.innerHTML = '';
+
+        const cancelBtn = document.createElement('button');
+        cancelBtn.className = "px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl min-w-[70px]";
+        cancelBtn.innerText = "취소";
+        cancelBtn.onclick = () => {
+            modal.classList.add('hidden');
+        };
+
+        const confirmBtn = document.createElement('button');
+        confirmBtn.className = "px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs rounded-xl shadow-md min-w-[70px]";
+        confirmBtn.innerText = "확인";
+        confirmBtn.onclick = () => {
+            modal.classList.add('hidden');
+            if (typeof onConfirm === 'function') onConfirm();
+        };
+
+        btnContainer.appendChild(cancelBtn);
+        btnContainer.appendChild(confirmBtn);
+        modal.classList.remove('hidden');
+    }
+
+    // 탭 전환 기능
+    function switchTab(tabId, title, element) {
+        document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+        document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('block'));
+        document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('text-indigo-600'));
+
+        document.getElementById(`tab-${tabId}`).classList.remove('hidden');
+        document.getElementById(`tab-${tabId}`).classList.add('block');
+        element.classList.add('text-indigo-600');
+        document.getElementById('header-title').innerHTML = `<span>📅</span> ${title}`;
+    }
+
+    function initTimetableEvents() {
+        const gradeSelect = document.getElementById('select-grade');
+        const classSelect = document.getElementById('select-class');
+
+        gradeSelect.addEventListener('change', () => {
+            updateClassOptions();
+            renderTimetable();
+        });
+        classSelect.addEventListener('change', renderTimetable);
+    }
+
+    function updateClassOptions() {
+        const gradeSelect = document.getElementById('select-grade');
+        const classSelect = document.getElementById('select-class');
+        const selectedGrade = gradeSelect.value;
+
+        classSelect.innerHTML = '';
+        let maxClass = (selectedGrade === '3') ? 5 : 4;
+
+        for (let c = 1; c <= maxClass; c++) {
+            const opt = document.createElement('option');
+            opt.value = c;
+            opt.innerText = `${c}반`;
+            classSelect.appendChild(opt);
+        }
+    }
+
+    // 과목 해시 기반 파스텔 색상 반환
+    function getColorForSubject(subject) {
+        if (!subject) return '#ffffff';
+        let hash = 0;
+        for (let i = 0; i < subject.length; i++) {
+            hash = subject.charCodeAt(i) + ((hash << 5) - hash);
+        }
+        const hue = Math.abs(hash % 360);
+        return `hsl(${hue}, 70%, 93%)`;
+    }
+
+    async function fetchTimetable() {
+        const url = 'https://script.google.com/macros/s/AKfycbxm5dUC5HkUiHYjrkwuVWG1Quvan-_mUIY3SJhPwnvaCW30iw83CsFavm4LwthFfAz-mw/exec?action=cached';
+        try {
+            const response = await fetch(url);
+            if (!response.ok) throw new Error();
+            timetableData = await response.json();
+
+            document.getElementById('timetable-loading').classList.add('hidden');
+            document.getElementById('timetable-view').classList.remove('hidden');
+
+            if (timetableData.syncedAt) {
+                const syncDate = new Date(timetableData.syncedAt);
+                const h = String(syncDate.getHours()).padStart(2, '0');
+                const m = String(syncDate.getMinutes()).padStart(2, '0');
+                document.getElementById('sync-time-display').innerText = `마지막 업데이트: ${h}시 ${m}분`;
+            }
+            renderTimetable();
+        } catch {
+            document.getElementById('timetable-loading').classList.add('hidden');
+            document.getElementById('timetable-error').classList.remove('hidden');
+        }
+    }
+
+    function switchWeek(idx) {
+        currentWeekIdx = idx;
+        document.getElementById('btn-this-week').classList.toggle('bg-white', idx === 0);
+        document.getElementById('btn-this-week').classList.toggle('shadow-xs', idx === 0);
+        document.getElementById('btn-next-week').classList.toggle('bg-white', idx === 1);
+        document.getElementById('btn-next-week').classList.toggle('shadow-xs', idx === 1);
+        renderTimetable();
+    }
+
+    function renderTimetable() {
+        if (!timetableData || !timetableData.weeks[currentWeekIdx]) return;
+        const grade = document.getElementById('select-grade').value;
+        const cls = document.getElementById('select-class').value;
+        const gridBody = document.getElementById('grid-body');
+        gridBody.innerHTML = '';
+
+        const headers = ['교시', ...WEEKDAYS];
+        headers.forEach(h => {
+            const hDiv = document.createElement('div');
+            hDiv.className = 'bg-slate-50 py-2.5 text-center text-xs font-extrabold ' + (h === '교시' ? 'text-indigo-600' : 'text-slate-500');
+            hDiv.innerText = h;
+            gridBody.appendChild(hDiv);
+        });
+
+        const weekData = timetableData.weeks[currentWeekIdx];
+        if (!weekData.timetable[grade] || !weekData.timetable[grade][cls]) {
+            gridBody.innerHTML = `<div class="col-span-6 text-center text-xs text-slate-400 py-10 font-bold bg-white">시간표 데이터가 제공되지 않는 학급입니다.</div>`;
+            return;
+        }
+
+        const classData = weekData.timetable[grade][cls];
+
+        for (let periodIdx = 0; periodIdx < MAX_PERIOD; periodIdx++) {
+            const pCell = document.createElement('div');
+            pCell.className = 'bg-slate-50 text-center font-extrabold flex justify-center items-center text-xs text-slate-400 py-3.5';
+            pCell.innerHTML = `<span>${periodIdx + 1}</span>`;
+            gridBody.appendChild(pCell);
+
+            for (let dayIdx = 0; dayIdx < 5; dayIdx++) {
+                const dayArray = classData[dayIdx] || [];
+                const cell = dayArray[periodIdx];
+                const subject = cell && cell.subject ? cell.subject : '';
+                const teacher = cell && cell.teacher ? cell.teacher : '';
+
+                const cellDiv = document.createElement('div');
+                cellDiv.className = 'bg-white p-1 text-center flex flex-col justify-center items-center min-h-[60px] leading-tight';
+                cellDiv.style.backgroundColor = getColorForSubject(subject);
+
+                if (subject) {
+                    cellDiv.innerHTML = `
+                        <span class="text-xs font-black text-slate-800 tracking-tight break-all">${subject}</span>
+                        <span class="text-[9px] text-slate-500 font-semibold mt-0.5">${teacher}</span>
+                    `;
+                } else {
+                    cellDiv.innerHTML = `<span class="text-slate-300">-</span>`;
+                }
+                gridBody.appendChild(cellDiv);
+            }
+        }
+    }
+
+    function setMealToToday() {
+        mealActiveDateObj = new Date();
+        updateMealUI();
+    }
+
+    function changeMealDate(offset) {
+        mealActiveDateObj.setDate(mealActiveDateObj.getDate() + offset);
+        updateMealUI();
+    }
+
+    function onMealDateChanged(val) {
+        if (!val) return;
+        mealActiveDateObj = new Date(val);
+        updateMealUI();
+    }
+
+    function updateMealUI() {
+        const y = mealActiveDateObj.getFullYear();
+        const m = String(mealActiveDateObj.getMonth() + 1).padStart(2, '0');
+        const d = String(mealActiveDateObj.getDate()).padStart(2, '0');
+
+        // 날짜 캘린더 피커와 동기화
+        document.getElementById('meal-date-picker').value = `${y}-${m}-${d}`;
+
+        const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
+        document.getElementById('meal-active-date').innerText = `${y}년 ${m}월 ${d}일 (${dayNames[mealActiveDateObj.getDay()]}요일)`;
+
+        fetchMealData();
+    }
+
+    async function fetchMealData() {
+        document.getElementById('meal-loading').classList.remove('hidden');
+        document.getElementById('meal-container').classList.add('hidden');
+
+        const y = mealActiveDateObj.getFullYear();
+        const m = String(mealActiveDateObj.getMonth() + 1).padStart(2, '0');
+        const d = String(mealActiveDateObj.getDate()).padStart(2, '0');
+        const formattedDate = `${y}${m}${d}`;
+
+        // API URL
+        const url = `https://open.neis.go.kr/hub/mealServiceDietInfo?Type=json&pIndex=1&pSize=1&ATPT_OFCDC_SC_CODE=J10&SD_SCHUL_CODE=7551134&MLSV_YMD=${formattedDate}`;
+
+        try {
+            const response = await fetch(url);
+            const data = await response.json();
+
+            document.getElementById('meal-loading').classList.add('hidden');
+            document.getElementById('meal-container').classList.remove('hidden');
+
+            if (data.mealServiceDietInfo && data.mealServiceDietInfo[1] && data.mealServiceDietInfo[1].row) {
+                const row = data.mealServiceDietInfo[1].row[0];
+                const rawMenu = row.DDISH_NM;
+                const calInfo = row.CAL_INFO || '정보 없음';
+
+                const cleanMenu = rawMenu
+                    .replace(/\([^)]*\)/g, '')
+                    .replace(/[0-9.]/g, '')
+                    .replace(/\s+/g, ' ')
+                    .replaceAll('<br/>', '\n')
+                    .trim();
+
+                document.getElementById('meal-menu-content').innerText = cleanMenu;
+                document.getElementById('meal-calorie-badge').innerText = `🔥 ${calInfo}`;
+                document.getElementById('meal-calorie-badge').classList.remove('hidden');
+            } else {
+                tryCachedMeal(formattedDate);
+            }
+        } catch {
+            document.getElementById('meal-loading').classList.add('hidden');
+            document.getElementById('meal-container').classList.remove('hidden');
+            tryCachedMeal(formattedDate);
+        }
+    }
+
+    function tryCachedMeal(formattedDate) {
+        if (gwangsuMealDatabase[formattedDate]) {
+            document.getElementById('meal-menu-content').innerText = gwangsuMealDatabase[formattedDate];
+            document.getElementById('meal-calorie-badge').innerText = `💡 홈페이지 검증 식단`;
+            document.getElementById('meal-calorie-badge').classList.remove('hidden');
+        } else {
+            document.getElementById('meal-menu-content').innerHTML = `<span class="text-slate-400 font-bold text-xs leading-normal">주말이거나 급식 정보가 준비되지 않았습니다.<br>🏡 오늘은 맛있는 집밥을 추천해요!</span>`;
+            document.getElementById('meal-calorie-badge').classList.add('hidden');
+        }
+    }
+
+    function loadTimerData() {
+        const stored = localStorage.getItem('TIMER_DATA');
+        if (stored) {
+            timerSubjects = JSON.parse(stored);
+        } else {
+            timerSubjects = [
+                { id: 'math', name: '✏️ 국어/수학 공부', seconds: 0 },
+                { id: 'eng', name: '📚 영어 단어 암기', seconds: 0 }
+            ];
+            saveTimerData();
+        }
+        renderTimerList();
+        updateTotalStudyTime();
+    }
+
+    function saveTimerData() {
+        localStorage.setItem('TIMER_DATA', JSON.stringify(timerSubjects));
+    }
+
+    function renderTimerList() {
+        const listEl = document.getElementById('timer-list');
+        listEl.innerHTML = '';
+
+        timerSubjects.forEach(sub => {
+            const isRunning = activeTimerId === sub.id;
+            const card = document.createElement('div');
+            card.className = `border rounded-2xl p-4 flex flex-col gap-3 transition-all ${isRunning ? 'bg-indigo-50/70 border-indigo-200' : 'bg-slate-50 border-slate-200/50'}`;
+
+            card.innerHTML = `
+                <div class="flex justify-between items-center">
+                    <span class="text-xs font-black text-slate-800">${sub.name}</span>
+                    <button onclick="deleteTimerSubject('${sub.id}')" class="text-slate-300 hover:text-red-500 text-xs">✕</button>
+                </div>
+                <div class="flex justify-between items-center">
+                    <div class="text-xl font-bold font-mono text-slate-800">${formatTime(sub.seconds)}</div>
+                    <div class="flex gap-1.5">
+                        <button onclick="toggleTimer('${sub.id}')" class="px-3.5 py-1.5 ${isRunning ? 'bg-rose-500' : 'bg-indigo-600'} text-white font-extrabold text-xs rounded-xl shadow-xs">
+                            ${isRunning ? '정지' : '시작'}
+                        </button>
+                        <button onclick="resetTimer('${sub.id}')" class="px-2.5 py-1.5 bg-slate-200 text-slate-700 font-bold text-xs rounded-xl hover:bg-slate-300">
+                            리셋
+                        </button>
+                    </div>
+                </div>
+            `;
+            listEl.appendChild(card);
+        });
+    }
+
+    function toggleTimer(id) {
+        if (activeTimerId === id) {
+            clearInterval(timerInterval);
+            activeTimerId = null;
+        } else {
+            if (activeTimerId) {
+                clearInterval(timerInterval);
+            }
+            activeTimerId = id;
+            timerInterval = setInterval(() => {
+                const sub = timerSubjects.find(s => s.id === activeTimerId);
+                if (sub) {
+                    sub.seconds++;
+                    saveTimerData();
+                    renderTimerList();
+                    updateTotalStudyTime();
+                }
+            }, 1000);
+        }
+        renderTimerList();
+    }
+
+    function resetTimer(id) {
+        if (activeTimerId === id) {
+            clearInterval(timerInterval);
+            activeTimerId = null;
+        }
+        const sub = timerSubjects.find(s => s.id === id);
+        if (sub) {
+            sub.seconds = 0;
+            saveTimerData();
+            renderTimerList();
+            updateTotalStudyTime();
+        }
+    }
+
+    function openTimerModal() {
+        document.getElementById('modal-timer-add').classList.remove('hidden');
+        document.getElementById('input-timer-subject').focus();
+    }
+
+    function closeTimerModal() {
+        document.getElementById('modal-timer-add').classList.add('hidden');
+        document.getElementById('input-timer-subject').value = '';
+    }
+
+    function addTimerSubject() {
+        const nameInput = document.getElementById('input-timer-subject');
+        const val = nameInput.value.trim();
+        if (!val) {
+            showCustomAlert('과목 이름을 입력해주세요!', '입력 오류', '⚠️');
+            return;
+        }
+        const newSub = {
+            id: 'timer_' + Date.now(),
+            name: val,
+            seconds: 0
+        };
+        timerSubjects.push(newSub);
+        saveTimerData();
+        renderTimerList();
+        closeTimerModal();
+    }
+
+    function deleteTimerSubject(id) {
+        showCustomConfirm('해당 타이머를 삭제하시겠습니까? 기록된 시간이 지워집니다.', () => {
+            if (activeTimerId === id) {
+                clearInterval(timerInterval);
+                activeTimerId = null;
+            }
+            timerSubjects = timerSubjects.filter(s => s.id !== id);
+            saveTimerData();
+            renderTimerList();
+            updateTotalStudyTime();
+        }, '타이머 삭제');
+    }
+
+    function updateTotalStudyTime() {
+        const total = timerSubjects.reduce((acc, curr) => acc + curr.seconds, 0);
+        document.getElementById('timer-total-display').innerText = formatTime(total);
+    }
+
+    function formatTime(sec) {
+        const h = Math.floor(sec / 3600);
+        const m = Math.floor((sec % 3600) / 60);
+        const s = sec % 60;
+        return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    }
+
+    function loadMemoData() {
+        const stored = localStorage.getItem('MEMO_FILES');
+        if (stored) {
+            memoFiles = JSON.parse(stored);
+        } else {
+            memoFiles = [
+                { id: 'file_default_1', title: '📒 오늘의 일기', memos: [] },
+                { id: 'file_default_2', title: '🎯 학업 버킷리스트', memos: [] }
+            ];
+            saveMemoData();
+        }
+        renderFileList();
+    }
+
+    function saveMemoData() {
+        localStorage.setItem('MEMO_FILES', JSON.stringify(memoFiles));
+    }
+
+    function renderFileList() {
+        const container = document.getElementById('memo-file-list');
+        container.innerHTML = '';
+
+        memoFiles.forEach(file => {
+            const card = document.createElement('div');
+            card.className = "bg-slate-50 border border-slate-200/50 p-4 rounded-2xl flex flex-col justify-between hover:border-indigo-300 transition-colors cursor-pointer group min-h-[90px]";
+            card.onclick = () => enterFolderView(file.id);
+
+            card.innerHTML = `
+                <div class="flex justify-between items-start">
+                    <span class="text-xl">📁</span>
+                    <button onclick="event.stopPropagation(); deleteMemoFile('${file.id}')" class="text-slate-300 hover:text-red-500 font-extrabold text-xs opacity-0 group-hover:opacity-100 transition-opacity">✕</button>
+                </div>
+                <div class="mt-2 text-left">
+                    <h4 class="text-xs font-black text-slate-800 truncate">${file.title}</h4>
+                    <p class="text-[9px] text-slate-400 mt-0.5 font-semibold">메모 ${file.memos.length}개</p>
+                </div>
+            `;
+            container.appendChild(card);
+        });
+    }
+
+    function openFileCreateModal() {
+        document.getElementById('modal-file-create').classList.remove('hidden');
+        document.getElementById('input-file-name').focus();
+    }
+
+    function closeFileCreateModal() {
+        document.getElementById('modal-file-create').classList.add('hidden');
+        document.getElementById('input-file-name').value = '';
+    }
+
+    function createMemoFile() {
+        const nameInput = document.getElementById('input-file-name');
+        const val = nameInput.value.trim();
+        if (!val) {
+            showCustomAlert('파일 이름을 채워주세요!', '입력 오류', '📁');
+            return;
+        }
+
+        const newFile = {
+            id: 'file_' + Date.now(),
+            title: '📁 ' + val,
+            memos: []
+        };
+        memoFiles.push(newFile);
+        saveMemoData();
+        renderFileList();
+        closeFileCreateModal();
+    }
+
+    function deleteMemoFile(id) {
+        showCustomConfirm('정말로 이 파일과 내부의 모든 메모장을 한꺼번에 삭제할까요?', () => {
+            memoFiles = memoFiles.filter(f => f.id !== id);
+            saveMemoData();
+            renderFileList();
+            if (activeFileId === id) {
+                exitFolderView();
+            }
+        }, '파일 삭제', '🗑️');
+    }
+
+    // 파일 내부 진입
+    function enterFolderView(id) {
+        activeFileId = id;
+        const file = memoFiles.find(f => f.id === id);
+        if (!file) return;
+
+        document.getElementById('active-file-title').innerText = file.title;
+        document.getElementById('memo-inside-panel').classList.remove('hidden');
+        renderMemos();
+    }
+
+    function exitFolderView() {
+        activeFileId = null;
+        document.getElementById('memo-inside-panel').classList.add('hidden');
+        renderFileList();
+    }
+
+    function renderMemos() {
+        const container = document.getElementById('memos-container');
+        container.innerHTML = '';
+
+        const file = memoFiles.find(f => f.id === activeFileId);
+        if (!file) return;
+
+        if (file.memos.length === 0) {
+            container.innerHTML = `<div class="text-center py-10 text-slate-300 text-xs font-bold">오른쪽 위 '메모추가'를 눌러 첫 메모를 기록해보세요!</div>`;
+            return;
+        }
+
+        file.memos.forEach(memo => {
+            const card = document.createElement('div');
+            card.className = "bg-indigo-50/20 border border-indigo-100 p-4 rounded-2xl flex flex-col gap-2 shadow-xs";
+
+            card.innerHTML = `
+                <div class="flex justify-between items-center border-b border-slate-100/50 pb-1.5">
+                    <span class="text-[9px] font-bold text-indigo-400 font-mono">${memo.time}</span>
+                    <div class="flex gap-2">
+                        <button onclick="openMemoEditModal('${memo.id}')" class="text-[9px] font-bold text-slate-500 hover:text-indigo-600">수정</button>
+                        <button onclick="deleteMemo('${memo.id}')" class="text-[9px] font-bold text-rose-400 hover:text-rose-600">삭제</button>
+                    </div>
+                </div>
+                <p class="text-xs text-slate-700 font-medium whitespace-pre-wrap leading-relaxed break-all">${memo.content}</p>
+            `;
+            container.appendChild(card);
+        });
+    }
+
+    function openMemoAddModal() {
+        editingMemoId = null;
+        document.getElementById('memo-modal-title').innerText = "📝 새로운 메모 작성";
+        document.getElementById('textarea-memo-content').value = '';
+        document.getElementById('modal-memo-add').classList.remove('hidden');
+        document.getElementById('textarea-memo-content').focus();
+
+        document.getElementById('btn-memo-save').onclick = saveMemo;
+    }
+
+    function openMemoEditModal(id) {
+        editingMemoId = id;
+        const file = memoFiles.find(f => f.id === activeFileId);
+        const memo = file.memos.find(m => m.id === id);
+        if (!memo) return;
+
+        document.getElementById('memo-modal-title').innerText = "📝 메모장 수정하기";
+        document.getElementById('textarea-memo-content').value = memo.content;
+        document.getElementById('modal-memo-add').classList.remove('hidden');
+        document.getElementById('textarea-memo-content').focus();
+
+        document.getElementById('btn-memo-save').onclick = saveMemo;
+    }
+
+    function closeMemoAddModal() {
+        document.getElementById('modal-memo-add').classList.add('hidden');
+        document.getElementById('textarea-memo-content').value = '';
+    }
+
+    function saveMemo() {
+        const textVal = document.getElementById('textarea-memo-content').value.trim();
+        if (!textVal) {
+            showCustomAlert('내용을 입력해주세요!', '입력 오류', '✍️');
+            return;
+        }
+
+        const file = memoFiles.find(f => f.id === activeFileId);
+        if (!file) return;
+
+        const timeStr = new Date().toLocaleString('ko-KR', { hour12: false });
+
+        if (editingMemoId) {
+            const memo = file.memos.find(m => m.id === editingMemoId);
+            if (memo) {
+                memo.content = textVal;
+                memo.time = timeStr + ' (수정됨)';
+            }
+        } else {
+            const newMemo = {
+                id: 'memo_' + Date.now(),
+                content: textVal,
+                time: timeStr
+            };
+            file.memos.unshift(newMemo);
+        }
+
+        saveMemoData();
+        renderMemos();
+        closeMemoAddModal();
+    }
+
+    function deleteMemo(id) {
+        showCustomConfirm('이 메모를 영구 삭제할까요?', () => {
+            const file = memoFiles.find(f => f.id === activeFileId);
+            if (!file) return;
+
+            file.memos = file.memos.filter(m => m.id !== id);
+            saveMemoData();
+            renderMemos();
+        }, '메모 삭제', '🗑️');
+    }
+
+    async function fetchWeatherData() {
+        const url = 'https://api.open-meteo.com/v1/forecast?latitude=37.42&longitude=127.28&daily=weathercode,temperature_2m_max,temperature_2m_min&timezone=Asia/Seoul';
+        try {
+            const response = await fetch(url);
+            const data = await response.json();
+
+            // 로딩 스피너 숨김 및 데이터 컨테이너 가시화 (Tailwind hidden 토글 활용)
+            document.getElementById('weather-loading').classList.add('hidden');
+            document.getElementById('weather-container').classList.remove('hidden');
+
+            document.getElementById('today-temp').innerText = `${Math.round(data.daily.temperature_2m_max[0])}°C`;
+
+            const listContainer = document.getElementById('weather-week-list');
+            listContainer.innerHTML = '';
+            const dayLabels = ['오늘', '내일', '모레', '글피', '월', '화', '수', '목', '금'];
+
+            for (let i = 0; i < 7; i++) {
+                const dateRaw = data.daily.time[i];
+                const maxTemp = Math.round(data.daily.temperature_2m_max[i]);
+                const minTemp = Math.round(data.daily.temperature_2m_min[i]);
+                const code = data.daily.weathercode[i];
+
+                let icon = '☀️';
+                let desc = '맑음';
+                if (code > 0 && code <= 3) { icon = '⛅'; desc = '구름조금'; }
+                else if (code >= 45 && code <= 48) { icon = '🌫️'; desc = '안개'; }
+                else if (code >= 51 && code <= 67) { icon = '🌧️'; desc = '비'; }
+                else if (code >= 71 && code <= 77) { icon = '❄️'; desc = '눈'; }
+                else if (code >= 80) { icon = '⛈️'; desc = '소나기'; }
+
+                if (i === 0) {
+                    document.getElementById('today-desc').innerText = desc;
+                }
+
+                const item = document.createElement('div');
+                item.className = 'flex justify-between items-center py-2.5';
+                item.innerHTML = `
+                    <span class="text-xs font-bold text-slate-600 w-16">${dayLabels[i] || dateRaw.substring(5)}</span>
+                    <span class="text-base text-center flex-1">${icon}</span>
+                    <span class="text-[11px] font-bold text-slate-500 w-20 text-right">${minTemp}° / ${maxTemp}°</span>
+                `;
+                listContainer.appendChild(item);
+            }
+        } catch {
+            document.getElementById('weather-loading').classList.add('hidden');
+        }
+    }
+
+    // 명언 로테이션 로직
+    function getNewQuote() {
+        const textEl = document.getElementById('top-quote-text');
+        const authorEl = document.getElementById('top-quote-author');
+
+        const randomIndex = Math.floor(Math.random() * quotes.length);
+        const q = quotes[randomIndex];
+
+        textEl.style.opacity = '0';
+        authorEl.style.opacity = '0';
+        textEl.style.transition = 'opacity 0.25s';
+        authorEl.style.transition = 'opacity 0.25s';
+
+        setTimeout(() => {
+            textEl.innerText = q.text;
+            authorEl.innerText = `- ${q.author}`;
+            textEl.style.opacity = '1';
+            authorEl.style.opacity = '1';
+        }, 250);
+    }
+</script>
+
+</body>
+</html>
