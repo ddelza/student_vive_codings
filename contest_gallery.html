@@ -57,6 +57,20 @@
   .award-gold { background: linear-gradient(135deg,#fff2b8,#ffd24d); color: #6b4c00; }
   .award-silver { background: linear-gradient(135deg,#f2f2f2,#c7c7c7); color: #444; }
   .award-bronze { background: linear-gradient(135deg,#eac199,#c98a4b); color: #4a2c00; }
+  .award-green { background: linear-gradient(135deg,#e3f7c8,#b8e986); color: #3d6b12; }
+  .award-gray { background: linear-gradient(135deg,#eeeeee,#cfcfcf); color: #444; }
+
+  /* 카드 왼쪽 테두리 + 라벨 색을 시상 등급에 맞춰 바꿈 */
+  .card-gold { border-left-color: #e0a800; }
+  .card-gold .label { color: #a97600; }
+  .card-silver { border-left-color: #9a9a9a; }
+  .card-silver .label { color: #6e6e6e; }
+  .card-bronze { border-left-color: #b5762f; }
+  .card-bronze .label { color: #8a5620; }
+  .card-green { border-left-color: #7cbf3f; }
+  .card-green .label { color: #4c8018; }
+  .card-gray { border-left-color: #9a9a9a; }
+  .card-gray .label { color: #6e6e6e; }
 
   .card-details { position: relative; max-height: 230px; overflow: hidden; }
   .card-details.expanded { max-height: none; }
@@ -112,19 +126,34 @@ function toggleNotice(id) {
   toggle.textContent = collapsed ? '펼치기 ▼' : '접기 ▲';
 }
 
+// 시상 등급별 배지/카드 색상을 한 곳에서 관리
+var AWARD_META = {
+  '최우수상': { cls: 'gold', icon: '👑' },
+  '우수상': { cls: 'silver', icon: '👑' },
+  '장려상': { cls: 'bronze', icon: '👑' },
+  '참가상': { cls: 'green', icon: '🌱' },
+  '참가상(링크 잘못 제출)': { cls: 'green', icon: '🌱' },
+  '중복제출 또는 링크 잘못 제출': { cls: 'gray', icon: '⚠️' }
+};
+
+function awardMeta(award) {
+  return AWARD_META[award] || null;
+}
+
 function awardBadge(award) {
-  if (award === '최우수상') return '<div class="award-badge award-gold">👑 최우수상</div>';
-  if (award === '우수상') return '<div class="award-badge award-silver">👑 우수상</div>';
-  if (award === '장려상') return '<div class="award-badge award-bronze">👑 장려상</div>';
-  return '';
+  var meta = awardMeta(award);
+  if (!meta) return '';
+  return '<div class="award-badge award-' + meta.cls + '">' + meta.icon + ' ' + escapeHtml(award) + '</div>';
 }
 
 function renderCard(entry, i) {
   var linkHtml = entry.link
     ? '<a class="link-btn" href="' + escapeHtml(entry.link) + '" target="_blank" rel="noopener">🔗 작품 열어보기</a>'
     : '<div class="no-link">아직 링크 없음 (아이디어 단계)</div>';
+  var meta = awardMeta(entry.award);
+  var cardClass = meta ? 'card card-' + meta.cls : 'card';
 
-  return '<div class="card">' +
+  return '<div class="' + cardClass + '">' +
     awardBadge(entry.award) +
     '<div class="title">' + escapeHtml(entry.title) + '</div>' +
     '<div class="author">' + escapeHtml(entry.studentName) + ' (' + escapeHtml(entry.studentId) + ')</div>' +
