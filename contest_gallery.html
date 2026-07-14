@@ -80,6 +80,24 @@
   }
   .card-details.expanded.has-fade::after { display: none; }
   .more-toggle { color: #2d6cdf; font-size: 12.5px; font-weight: bold; cursor: pointer; margin-top: 8px; display: none; }
+
+  .reaction-row { display: flex; gap: 8px; margin-top: 12px; }
+  .react-btn { border: 1px solid #e2e6f0; background: #f7f8fb; border-radius: 999px; padding: 5px 11px; font-size: 12.5px; cursor: pointer; }
+  .react-btn:hover { background: #eef1f8; }
+  .react-btn.active { background: #ffe9e9; border-color: #f08a8a; color: #c0392b; }
+  .comment-toggle { font-size: 12px; color: #2d6cdf; cursor: pointer; margin-top: 9px; display: inline-block; }
+  .comment-box { margin-top: 8px; border-top: 1px dashed #e2e6f0; padding-top: 8px; }
+  .comment-item { font-size: 12.5px; margin-bottom: 6px; line-height: 1.45; }
+  .comment-item b { color: #1c2238; }
+  .comment-item .ctime { color: #aab1c0; font-size: 11px; margin-left: 4px; }
+  .comment-item.reply { margin-left: 18px; color: #555; }
+  .comment-action { font-size: 11px; color: #2d6cdf; cursor: pointer; margin-left: 4px; }
+  .comment-action.danger { color: #c0392b; }
+  .comment-input-row { display: flex; gap: 6px; margin-top: 6px; }
+  .comment-input-row.reply-input { margin-left: 18px; }
+  .comment-input-row input { flex: 1; padding: 7px 9px; border: 1px solid #e2e6f0; border-radius: 7px; font-size: 12.5px; box-sizing: border-box; }
+  .comment-input-row button { padding: 7px 11px; border: none; border-radius: 7px; background: #2d6cdf; color: #fff; font-size: 12.5px; cursor: pointer; }
+  .no-comments { font-size: 12px; color: #7f8c8d; }
 </style>
 </head>
 <body>
@@ -146,12 +164,75 @@ function awardBadge(award) {
   return '<div class="award-badge award-' + meta.cls + '">' + meta.icon + ' ' + escapeHtml(award) + '</div>';
 }
 
+// ===================== 댓글/좋아요용 이름 식별 (로그인 없이, 이름만 기억) =====================
+function getViewerName() {
+  var name = localStorage.getItem('contest_gallery_name');
+  if (name) return name;
+  name = prompt('댓글/좋아요에 사용할 이름을 입력해주세요 (예: 3학년 홍길동)');
+  if (!name) return null;
+  name = name.trim();
+  if (!name) return null;
+  localStorage.setItem('contest_gallery_name', name);
+  return name;
+}
+
+var expandedComments = {};
+var expandedReplyFor = {};
+
+function renderCommentActions(entryId, c) {
+  var actions = '<span class="comment-action" onclick="toggleReplyBox(\'' + c.id + '\')">답글</span>';
+  if (c.isMine) {
+    actions += ' <span class="comment-action danger" onclick="deleteComment(\'' + entryId + '\',\'' + c.id + '\')">삭제</span>';
+  }
+  return actions;
+}
+
+function renderReplyBox(entryId, parentId) {
+  if (!expandedReplyFor[parentId]) return '';
+  return '<div class="comment-input-row reply-input">' +
+    '<input type="text" id="reply-input-' + parentId + '" placeholder="답글을 남겨보세요" onkeydown="if(event.key===\'Enter\')submitReply(\'' + entryId + '\',\'' + parentId + '\')">' +
+    '<button onclick="submitReply(\'' + entryId + '\',\'' + parentId + '\')">등록</button>' +
+  '</div>';
+}
+
+function renderComments(entry) {
+  var topLevel = entry.comments.filter(function (c) { return !c.parentId; });
+  if (topLevel.length === 0) {
+    return '<div class="no-comments">아직 댓글이 없어요. 첫 댓글을 남겨보세요!</div>';
+  }
+  return topLevel.map(function (c) {
+    var replies = entry.comments.filter(function (r) { return r.parentId === c.id; });
+    var html = '<div class="comment-item">💬 <b>' + escapeHtml(c.name) + '</b>: ' + escapeHtml(c.text) +
+      '<span class="ctime">' + escapeHtml(c.time) + '</span> ' + renderCommentActions(entry.entryId, c) + '</div>';
+    html += replies.map(function (r) {
+      return '<div class="comment-item reply">↳ <b>' + escapeHtml(r.name) + '</b>: ' + escapeHtml(r.text) +
+        '<span class="ctime">' + escapeHtml(r.time) + '</span> ' + renderCommentActions(entry.entryId, r) + '</div>';
+    }).join('');
+    html += renderReplyBox(entry.entryId, c.id);
+    return html;
+  }).join('');
+}
+
 function renderCard(entry, i) {
   var linkHtml = entry.link
     ? '<a class="link-btn" href="' + escapeHtml(entry.link) + '" target="_blank" rel="noopener">🔗 작품 열어보기</a>'
     : '<div class="no-link">아직 링크 없음 (아이디어 단계)</div>';
   var meta = awardMeta(entry.award);
   var cardClass = meta ? 'card card-' + meta.cls : 'card';
+  var eid = entry.entryId;
+
+  var expanded = !!expandedComments[eid];
+  var totalCommentCount = entry.comments.length;
+  var commentsHtml = '';
+  if (expanded) {
+    commentsHtml = '<div class="comment-box">' +
+      renderComments(entry) +
+      '<div class="comment-input-row">' +
+        '<input type="text" id="comment-input-' + eid + '" placeholder="댓글을 남겨보세요" onkeydown="if(event.key===\'Enter\')submitComment(\'' + eid + '\')">' +
+        '<button onclick="submitComment(\'' + eid + '\')">등록</button>' +
+      '</div>' +
+    '</div>';
+  }
 
   return '<div class="' + cardClass + '">' +
     awardBadge(entry.award) +
@@ -165,7 +246,109 @@ function renderCard(entry, i) {
     '</div>' +
     '<div class="more-toggle" id="toggle-' + i + '" onclick="toggleMore(' + i + ')">···더보기 ▾</div>' +
     linkHtml +
+    '<div class="reaction-row">' +
+      '<button class="react-btn' + (entry.myLiked ? ' active' : '') + '" onclick="toggleLike(\'' + eid + '\')">👍 좋아요 ' + entry.likeCount + '</button>' +
+    '</div>' +
+    '<div class="comment-toggle" onclick="toggleComments(\'' + eid + '\')">💬 댓글 ' + totalCommentCount + '개 ' + (expanded ? '숨기기 ▲' : '보기 ▼') + '</div>' +
+    commentsHtml +
   '</div>';
+}
+
+function findEntry(entryId) {
+  for (var i = 0; i < allEntries.length; i++) {
+    if (allEntries[i].entryId === entryId) return allEntries[i];
+  }
+  return null;
+}
+
+function toggleLike(entryId) {
+  var name = getViewerName();
+  if (!name) return;
+  fetch(APP_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify({ action: 'toggleContestLike', entryId: entryId, name: name })
+  })
+    .then(function (r) { return r.json(); })
+    .then(function (res) {
+      if (!res.success) { alert(res.message || '처리에 실패했습니다.'); return; }
+      var e = findEntry(entryId);
+      if (e) { e.likeCount = res.likeCount; e.myLiked = res.myLiked; }
+      filterEntries();
+    })
+    .catch(function () { alert('서버 연결에 실패했습니다.'); });
+}
+
+function toggleComments(entryId) {
+  expandedComments[entryId] = !expandedComments[entryId];
+  filterEntries();
+}
+
+function submitComment(entryId) {
+  var input = document.getElementById('comment-input-' + entryId);
+  var text = input.value.trim();
+  if (!text) return;
+  var name = getViewerName();
+  if (!name) return;
+  fetch(APP_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify({ action: 'addContestComment', entryId: entryId, name: name, text: text })
+  })
+    .then(function (r) { return r.json(); })
+    .then(function (res) {
+      if (!res.success) { alert(res.message || '댓글 등록에 실패했습니다.'); return; }
+      var e = findEntry(entryId);
+      if (e) e.comments = res.comments;
+      filterEntries();
+    })
+    .catch(function () { alert('서버 연결에 실패했습니다.'); });
+}
+
+function toggleReplyBox(commentId) {
+  expandedReplyFor[commentId] = !expandedReplyFor[commentId];
+  filterEntries();
+}
+
+function submitReply(entryId, parentId) {
+  var input = document.getElementById('reply-input-' + parentId);
+  var text = input.value.trim();
+  if (!text) return;
+  var name = getViewerName();
+  if (!name) return;
+  fetch(APP_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify({ action: 'addContestComment', entryId: entryId, name: name, text: text, parentId: parentId })
+  })
+    .then(function (r) { return r.json(); })
+    .then(function (res) {
+      if (!res.success) { alert(res.message || '답글 등록에 실패했습니다.'); return; }
+      var e = findEntry(entryId);
+      if (e) e.comments = res.comments;
+      expandedReplyFor[parentId] = false;
+      filterEntries();
+    })
+    .catch(function () { alert('서버 연결에 실패했습니다.'); });
+}
+
+function deleteComment(entryId, commentId) {
+  if (!confirm('이 댓글을 삭제할까요? (답글이 있다면 함께 삭제됩니다)')) return;
+  var name = getViewerName();
+  if (!name) return;
+  fetch(APP_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify({ action: 'deleteContestComment', entryId: entryId, name: name, commentId: commentId })
+  })
+    .then(function (r) { return r.json(); })
+    .then(function (res) {
+      if (!res.success) { alert(res.message || '댓글 삭제에 실패했습니다.'); return; }
+      var e = findEntry(entryId);
+      if (e) e.comments = res.comments;
+      filterEntries();
+    })
+    .catch(function () { alert('서버 연결에 실패했습니다.'); });
 }
 
 // 카드 내용이 접힌 상태의 높이(약 10줄 분량)보다 실제로 더 긴 경우에만
@@ -208,7 +391,8 @@ function filterEntries() {
   renderGallery(filtered);
 }
 
-fetch(APP_URL + '?action=getContestEntries')
+var savedViewerName = localStorage.getItem('contest_gallery_name') || '';
+fetch(APP_URL + '?action=getContestEntries&viewerName=' + encodeURIComponent(savedViewerName))
   .then(function (r) { return r.json(); })
   .then(function (entries) {
     allEntries = entries;
