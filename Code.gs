@@ -726,7 +726,7 @@ function getContestEntries() {
   if (lastRow < 1) return [];
 
   // 이 탭은 헤더 행 없이 1행부터 바로 데이터가 시작됨
-  var data = sheet.getRange(1, 1, lastRow, 6).getValues();
+  var data = sheet.getRange(1, 1, lastRow, 7).getValues(); // A~G (G열: 시상)
   var entries = [];
   for (var i = 0; i < data.length; i++) {
     if (!data[i][1]) continue; // 이름이 없는 빈 행은 건너뜀
@@ -736,8 +736,42 @@ function getContestEntries() {
       title: data[i][2],
       forWhom: data[i][3],
       link: data[i][4],
-      description: data[i][5]
+      description: data[i][5],
+      award: data[i][6] || ''
     });
   }
   return entries; // "대회출품" 탭에서 직접 정렬해둔 순서를 그대로 유지 (뒤집지 않음)
+}
+
+// 1회성 유틸 — Apps Script 편집기에서 직접 실행할 것.
+// "대회출품" 탭을 G열(시상) 기준으로 [최우수상 > 우수상 > 장려상 > 참가상 >
+// 참가상(링크 잘못 제출) > 중복제출 또는 링크 잘못 제출] 순서로 재배열한다.
+// 같은 시상 안에서는 원래 순서를 그대로 유지(안정 정렬)한다.
+function sortContestEntriesByAward() {
+  var RANK_ORDER = ['최우수상', '우수상', '장려상', '참가상', '참가상(링크 잘못 제출)', '중복제출 또는 링크 잘못 제출'];
+  var sheet = getContestEntrySheet_();
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 1) return '정렬할 데이터가 없습니다.';
+
+  var range = sheet.getRange(1, 1, lastRow, 7); // A~G
+  var data = range.getValues();
+
+  // 원래 행 순서를 안정 정렬의 기준(tie-breaker)으로 사용
+  var indexed = data.map(function (row, i) { return { row: row, i: i }; });
+  indexed.sort(function (a, b) {
+    var ai = RANK_ORDER.indexOf(String(a.row[6]).trim());
+    var bi = RANK_ORDER.indexOf(String(b.row[6]).trim());
+    if (ai === -1) ai = RANK_ORDER.length; // 목록에 없는 값은 맨 뒤로
+    if (bi === -1) bi = RANK_ORDER.length;
+    if (ai !== bi) return ai - bi;
+    return a.i - b.i;
+  });
+
+  var sortedData = indexed.map(function (x) { return x.row; });
+
+  // 학번(A열)이 "0000" 같은 숫자로 다시 뭉개지지 않도록 재배열 전에 텍스트 서식 고정
+  sheet.getRange(1, 1, lastRow, 1).setNumberFormat('@');
+  range.setValues(sortedData);
+
+  return '정렬 완료: ' + sortedData.length + '행';
 }
